@@ -54,3 +54,4 @@ kaleido-backend/uploads/
 # Misc
 *.log
 *.pid
+cloudflared
