@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data directories
+data/
+logs/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (frontend)
+node_modules/
+.next/
+out/
+
+# Internal planning docs
+*.planning.md
+.*laude*/
+.ai*/
+.ipynb_checkpoints/
+0[1-9]_*.md
+AGENTS.md
+*LAUDE*.md
+README\ *.md
+
+# Alembic cache
+kaleido-backend/migrations/versions/__pycache__/
+
+# Media uploads
+kaleido-backend/uploads/
+
+# Misc
+*.log
+*.pid

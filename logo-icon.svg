@@ -1,0 +1,21 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(64, 64)">
+    <g transform="rotate(0)">
+      <path d="M 0,-5 C -16,-20 -15,-50 0,-62 C 15,-50 16,-20 0,-5 Z" fill="#F59E0B" opacity="0.82"/>
+    </g>
+    <g transform="rotate(72)">
+      <path d="M 0,-5 C -16,-20 -15,-50 0,-62 C 15,-50 16,-20 0,-5 Z" fill="#F87171" opacity="0.78"/>
+    </g>
+    <g transform="rotate(144)">
+      <path d="M 0,-5 C -16,-20 -15,-50 0,-62 C 15,-50 16,-20 0,-5 Z" fill="#8B5CF6" opacity="0.78"/>
+    </g>
+    <g transform="rotate(216)">
+      <path d="M 0,-5 C -16,-20 -15,-50 0,-62 C 15,-50 16,-20 0,-5 Z" fill="#06B6D4" opacity="0.78"/>
+    </g>
+    <g transform="rotate(288)">
+      <path d="M 0,-5 C -16,-20 -15,-50 0,-62 C 15,-50 16,-20 0,-5 Z" fill="#22C55E" opacity="0.78"/>
+    </g>
+    <circle cx="0" cy="0" r="8" fill="#0F172A"/>
+    <circle cx="0" cy="0" r="3.5" fill="#F59E0B"/>
+  </g>
+</svg>

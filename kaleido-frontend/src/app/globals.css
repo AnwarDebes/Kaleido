@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf8f5;
+  --foreground: #1c1917;
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --card-border: rgba(245, 158, 11, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --section-alt: #fef7ee;
+  --muted: #78716c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-amber-50: var(--amber-50);
+  --color-amber-100: var(--amber-100);
+  --color-amber-200: var(--amber-200);
+  --color-amber-300: var(--amber-300);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-amber-600: var(--amber-600);
+  --color-amber-700: var(--amber-700);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-section-alt: var(--section-alt);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #0c0a09;
+  --foreground: #fafaf9;
+  --card-bg: rgba(28, 25, 23, 0.7);
+  --card-border: rgba(245, 158, 11, 0.2);
+  --glass-bg: rgba(28, 25, 23, 0.6);
+  --glass-border: rgba(68, 64, 60, 0.4);
+  --section-alt: #1c1917;
+  --muted: #a8a29e;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Glass morphism utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--amber-500), var(--amber-700));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* RTL support */
+[dir="rtl"] {
+  text-align: right;
+}

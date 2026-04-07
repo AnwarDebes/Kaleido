@@ -1,0 +1,9 @@
+[project]
+name = "kaleido-backend"
+version = "0.1.0"
+description = "Kaleido - AI-powered social media automation platform"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
