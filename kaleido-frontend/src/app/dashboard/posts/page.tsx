@@ -27,10 +27,12 @@ import { format } from "date-fns";
 
 interface Post {
   id: string;
-  text: string;
-  platforms: string[];
+  content_text: string | null;
+  platform_contents: Record<string, { text: string; hashtags: string[] }>;
+  content_type: string;
+  hashtags: string[] | null;
   status: "draft" | "scheduled" | "published" | "failed";
-  media_urls?: string[];
+  ai_generated: boolean;
   brand_id?: string;
   scheduled_at?: string;
   created_at: string;
@@ -185,8 +187,8 @@ export default function PostsPage() {
 
   function openEditPost(post: Post) {
     setEditingPost(post);
-    setEditorText(post.text);
-    setEditorPlatforms(post.platforms);
+    setEditorText(post.content_text || "");
+    setEditorPlatforms(Object.keys(post.platform_contents || {}));
     setShowEditor(true);
   }
 
@@ -206,15 +208,19 @@ export default function PostsPage() {
     if (!editorText.trim() || editorPlatforms.length === 0) return;
     setEditorSaving(true);
     try {
+      const platformContents: Record<string, { text: string; hashtags: string[] }> = {};
+      for (const p of editorPlatforms) {
+        platformContents[p] = { text: editorText, hashtags: [] };
+      }
       if (editingPost) {
         await api.patch(`/posts/${editingPost.id}`, {
-          text: editorText,
-          platforms: editorPlatforms,
+          content_text: editorText,
+          platform_contents: platformContents,
         });
       } else {
         await api.post("/posts", {
-          text: editorText,
-          platforms: editorPlatforms,
+          content_text: editorText,
+          platform_contents: platformContents,
         });
       }
       setShowEditor(false);
@@ -262,7 +268,8 @@ export default function PostsPage() {
         tone: aiTone,
         language: aiLanguage,
       });
-      setAiResult(res.data.data?.text ?? res.data.text ?? JSON.stringify(res.data));
+      const post = res.data.data;
+      setAiResult(post?.content_text ?? post?.text ?? JSON.stringify(post));
     } catch {
       setError("AI generation failed. Please try again.");
     } finally {
@@ -401,14 +408,14 @@ export default function PostsPage() {
 
                   {/* text preview */}
                   <p className="text-sm leading-relaxed mb-4 flex-1 line-clamp-3">
-                    {post.text?.length > 100
-                      ? post.text.slice(0, 100) + "..."
-                      : post.text}
+                    {(post.content_text || "")?.length > 100
+                      ? (post.content_text || "").slice(0, 100) + "..."
+                      : post.content_text || ""}
                   </p>
 
                   {/* platform tags */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {post.platforms?.map((p) => (
+                    {Object.keys(post.platform_contents || {}).map((p) => (
                       <span
                         key={p}
                         className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200/50"

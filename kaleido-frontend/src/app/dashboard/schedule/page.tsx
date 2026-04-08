@@ -35,8 +35,8 @@ import {
 interface ScheduledPost {
   id: string;
   post_id?: string;
-  text: string;
-  platforms: string[];
+  content_text: string | null;
+  platform_contents: Record<string, unknown>;
   status: string;
   scheduled_at: string;
   created_at?: string;
@@ -310,7 +310,7 @@ export default function SchedulePage() {
                                 "h-1.5 w-1.5 rounded-full",
                                 STATUS_COLORS[p.status] ?? "bg-stone-400"
                               )}
-                              title={p.text?.slice(0, 40)}
+                              title={(p.content_text || "").slice(0, 40)}
                             />
                           ))}
                           {dayPosts.length > 3 && (
@@ -379,14 +379,14 @@ export default function SchedulePage() {
 
                         {/* text preview */}
                         <p className="text-xs leading-relaxed mb-2 line-clamp-2">
-                          {post.text?.length > 80
-                            ? post.text.slice(0, 80) + "..."
-                            : post.text}
+                          {(post.content_text || "").length > 80
+                            ? (post.content_text || "").slice(0, 80) + "..."
+                            : post.content_text || ""}
                         </p>
 
                         {/* platforms */}
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {post.platforms?.map((p) => (
+                          {Object.keys(post.platform_contents || {}).map((p) => (
                             <span
                               key={p}
                               className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200/50"

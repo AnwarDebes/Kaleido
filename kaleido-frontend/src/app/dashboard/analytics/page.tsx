@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
       }
       if (postsRes.status === "fulfilled") {
         const postsData = postsRes.value.data.data;
-        setTopPosts(postsData?.items || postsData || []);
+        setTopPosts(Array.isArray(postsData) ? postsData : postsData?.items || []);
       }
 
       const allFailed = [overviewRes, growthRes, bestTimesRes, postsRes].every(

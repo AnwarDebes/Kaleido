@@ -33,20 +33,18 @@ interface OverviewMetrics {
 
 interface Post {
   id: string;
-  title?: string;
-  content?: string;
+  content_text?: string;
   status: string;
-  platforms: string[];
+  platform_contents: Record<string, unknown>;
   created_at: string;
 }
 
 interface ScheduledPost {
   id: string;
-  post_id: string;
-  title?: string;
-  content?: string;
-  scheduled_time: string;
-  platform: string;
+  content_text?: string;
+  platform_contents: Record<string, unknown>;
+  status: string;
+  scheduled_at: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -366,13 +364,13 @@ export default function DashboardPage() {
                       className="border-b border-stone-100 dark:border-stone-800 last:border-0"
                     >
                       <td className="py-3 px-2 text-foreground">
-                        {truncate(post.title || post.content || "Untitled", 50)}
+                        {truncate(post.content_text || "Untitled", 50)}
                       </td>
                       <td className="py-3 px-2">
                         <StatusBadge status={post.status} />
                       </td>
                       <td className="py-3 px-2 text-muted hidden sm:table-cell">
-                        {post.platforms?.join(", ") || "-"}
+                        {Object.keys(post.platform_contents || {}).join(", ") || "-"}
                       </td>
                       <td className="py-3 px-2 text-muted hidden md:table-cell">
                         {formatDate(post.created_at)}
@@ -409,16 +407,16 @@ export default function DashboardPage() {
                   className="flex flex-col gap-1 py-3 border-b border-stone-100 dark:border-stone-800 last:border-0"
                 >
                   <p className="text-sm text-foreground font-medium">
-                    {truncate(item.title || item.content || "Untitled", 40)}
+                    {truncate(item.content_text || "Untitled", 40)}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-muted">
                     <span className="inline-flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {formatDate(item.scheduled_time)}{" "}
-                      {formatTime(item.scheduled_time)}
+                      {formatDate(item.scheduled_at)}{" "}
+                      {formatTime(item.scheduled_at)}
                     </span>
                     <span className="inline-flex items-center gap-1 capitalize">
-                      {item.platform}
+                      {Object.keys(item.platform_contents || {}).join(", ")}
                     </span>
                   </div>
                 </li>

@@ -22,10 +22,18 @@ import { format } from "date-fns";
 interface BlogPost {
   id: string;
   title: string;
-  content: string;
+  content_markdown: string;
+  excerpt?: string;
+  slug?: string;
+  tags?: string[];
+  category?: string;
+  seo_title?: string;
+  seo_description?: string;
   status: "draft" | "published";
   brand_id?: string;
   word_count?: number;
+  reading_time_minutes?: number;
+  ai_generated?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -102,7 +110,7 @@ export default function BlogPage() {
   function openEditPost(post: BlogPost) {
     setEditingPost(post);
     setTitle(post.title);
-    setContent(post.content);
+    setContent(post.content_markdown || "");
     setStatus(post.status);
     setBrandId(post.brand_id || "");
     setView("edit");
@@ -117,7 +125,7 @@ export default function BlogPage() {
     setSuccess("");
 
     try {
-      const payload: Record<string, unknown> = { title, content, status };
+      const payload: Record<string, unknown> = { title, content_markdown: content, status };
       if (brandId) payload.brand_id = brandId;
 
       if (editingPost) {
@@ -169,7 +177,7 @@ export default function BlogPage() {
       const res = await api.post("/blog/posts/generate", payload);
       const generated = res.data.data;
       setTitle(generated.title || genTopic);
-      setContent(generated.content || "");
+      setContent(generated.content_markdown || generated.content || "");
       setStatus("draft");
       setBrandId(genBrandId);
       setView("edit");
@@ -298,7 +306,7 @@ export default function BlogPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed flex-1">
-                    {getExcerpt(post.content)}
+                    {getExcerpt(post.content_markdown)}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-muted">
                     <span className="flex items-center gap-1">
@@ -307,7 +315,7 @@ export default function BlogPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <FileText className="h-3 w-3" />
-                      {post.word_count ?? getWordCount(post.content)} words
+                      {post.word_count ?? getWordCount(post.content_markdown)} words
                     </span>
                   </div>
                   <div className="flex gap-2 pt-1 border-t border-card-border">

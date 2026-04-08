@@ -25,9 +25,14 @@ import { format } from "date-fns";
 interface Newsletter {
   id: string;
   subject: string;
-  content: string;
+  content_markdown: string | null;
+  preview_text?: string;
   status: "draft" | "sent";
   brand_id?: string;
+  recipients_count?: number;
+  opens_count?: number;
+  clicks_count?: number;
+  ai_generated?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -126,7 +131,7 @@ export default function NewslettersPage() {
   function openEditNewsletter(nl: Newsletter) {
     setEditingNl(nl);
     setSubject(nl.subject);
-    setContent(nl.content);
+    setContent(nl.content_markdown || "");
     setBrandId(nl.brand_id || "");
     setView("edit");
     setError("");
@@ -140,7 +145,7 @@ export default function NewslettersPage() {
     setSuccess("");
 
     try {
-      const payload: Record<string, unknown> = { subject, content };
+      const payload: Record<string, unknown> = { subject, content_markdown: content };
       if (brandId) payload.brand_id = brandId;
 
       if (editingNl) {
@@ -199,7 +204,7 @@ export default function NewslettersPage() {
       const res = await api.post("/newsletters/generate", payload);
       const generated = res.data.data;
       setSubject(generated.subject || genTopic);
-      setContent(generated.content || "");
+      setContent(generated.content_markdown || generated.content || "");
       setBrandId(genBrandId);
       setView("edit");
       setSuccess("Content generated. Review and save when ready.");
@@ -378,7 +383,7 @@ export default function NewslettersPage() {
                         {nl.status === "sent" ? "Sent" : "Draft"}
                       </span>
                     </div>
-                    <p className="text-xs text-muted truncate">{nl.content.slice(0, 120)}</p>
+                    <p className="text-xs text-muted truncate">{(nl.content_markdown || "").slice(0, 120)}</p>
                     <span className="flex items-center gap-1 text-xs text-muted mt-1">
                       <Clock className="h-3 w-3" />
                       {format(new Date(nl.created_at), "MMM d, yyyy")}
