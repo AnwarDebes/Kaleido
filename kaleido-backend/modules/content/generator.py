@@ -58,7 +58,7 @@ class ContentGenerator:
                 temperature=0.7,
             )
         except Exception as e:
-            logger.error("content_generation_failed", error=str(e))
+            logger.error("content_generation_failed", error=str(e), error_type=type(e).__name__)
             # Fallback: create a basic post structure
             response = {
                 "posts": {p: {"text": f"[AI generation unavailable] Topic: {topic}", "hashtags": []} for p in platforms},
@@ -85,7 +85,7 @@ class ContentGenerator:
             hashtags=list(all_hashtags),
             ai_generated=True,
             ai_prompt=topic,
-            ai_model="gemma4:26b-a4b-q4_K_M",
+            ai_model="gemma3:12b-it-q4_K_M",
             status="draft",
         )
         db.add(post)

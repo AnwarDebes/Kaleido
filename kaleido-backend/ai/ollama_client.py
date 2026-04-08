@@ -21,7 +21,7 @@ class OllamaClient:
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=300) as client:
             resp = await client.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -52,7 +52,7 @@ class OllamaClient:
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=300) as client:
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
@@ -100,7 +100,7 @@ class OllamaClient:
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
         """Stream chat response tokens."""
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=300) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",

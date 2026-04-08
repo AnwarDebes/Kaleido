@@ -152,7 +152,7 @@ Return ONLY valid JSON."""
             result = await ollama_client.generate_structured(
                 prompt=prompt,
                 schema={"type": "object"},
-                model="gemma4:26b-a4b-q4_K_M",
+                model="gemma3:12b-it-q4_K_M",
             )
             content_plan = result if isinstance(result, dict) else {"raw_plan": str(result)}
         except Exception as e:

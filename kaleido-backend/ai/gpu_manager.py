@@ -35,17 +35,17 @@ class GPUManager:
 
     async def _unload_current(self):
         if self.current_mode == GPUMode.TEXT_HEAVY:
-            await self._ollama_unload("gemma4:26b-a4b-q4_K_M")
+            await self._ollama_unload("gemma3:12b-it-q4_K_M")
         elif self.current_mode == GPUMode.DUAL_LIGHT:
-            await self._ollama_unload("gemma4:e4b-q4_K_M")
+            await self._ollama_unload("gemma3:12b-it-q4_K_M")
 
     async def _load_mode(self, mode: GPUMode):
         if mode == GPUMode.TEXT_HEAVY:
-            await self._ollama_load("gemma4:26b-a4b-q4_K_M")
+            await self._ollama_load("gemma3:12b-it-q4_K_M")
         elif mode in (GPUMode.IMAGE_GEN, GPUMode.VIDEO_GEN):
             pass  # ComfyUI loads on workflow execution
         elif mode == GPUMode.DUAL_LIGHT:
-            await self._ollama_load("gemma4:e4b-q4_K_M")
+            await self._ollama_load("gemma3:12b-it-q4_K_M")
 
     async def _ollama_unload(self, model: str):
         try:

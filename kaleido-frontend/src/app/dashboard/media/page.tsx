@@ -80,10 +80,8 @@ export default function MediaPage() {
       if (selectedFolder) params.folder = selectedFolder;
       if (fileTypeFilter) params.file_type = fileTypeFilter;
       const res = await api.get("/media", { params });
-      setMedia(res.data.data?.items || res.data.data || []);
-      if (res.data.data?.meta) setPagination(res.data.data.meta);
-      else if (res.data.meta) setPagination(res.data.meta);
-      else setPagination(null);
+      setMedia(res.data.data || []);
+      setPagination(res.data.meta || null);
     } catch {
       setError("Failed to load media. Please try again.");
     } finally {

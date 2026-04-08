@@ -20,10 +20,10 @@ class ModelRouter:
     ) -> str:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma4:e4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma4:26b-a4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
 
         return await ollama_client.generate_text(
             prompt=prompt,
@@ -42,10 +42,10 @@ class ModelRouter:
     ) -> dict:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma4:e4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma4:26b-a4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
 
         return await ollama_client.generate_structured(
             prompt=prompt,
@@ -92,10 +92,10 @@ class ModelRouter:
     ) -> str:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma4:e4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma4:26b-a4b-q4_K_M"
+            model = "gemma3:12b-it-q4_K_M"
 
         return await ollama_client.generate_chat(
             messages=messages,

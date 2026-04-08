@@ -105,10 +105,8 @@ export default function CampaignsPage() {
       const params: Record<string, string | number> = { page, per_page: 20 };
       if (statusFilter) params.status = statusFilter;
       const res = await api.get("/campaigns", { params });
-      setCampaigns(res.data.data?.items || res.data.data || []);
-      if (res.data.data?.meta) setPagination(res.data.data.meta);
-      else if (res.data.meta) setPagination(res.data.meta);
-      else setPagination(null);
+      setCampaigns(res.data.data || []);
+      setPagination(res.data.meta || null);
     } catch {
       setError("Failed to load campaigns.");
     } finally {

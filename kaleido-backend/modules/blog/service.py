@@ -167,7 +167,7 @@ Write the full blog post in Markdown format."""
             result = await ollama_client.generate_text(
                 prompt=prompt,
                 system="You are an expert content writer who creates engaging, SEO-optimized blog posts.",
-                model="gemma4:26b-a4b-q4_K_M",
+                model="gemma3:12b-it-q4_K_M",
             )
             content = result if isinstance(result, str) else str(result)
         except Exception as e:
@@ -203,7 +203,7 @@ Write the full blog post in Markdown format."""
             reading_time_minutes=max(1, len(content.split()) // 200),
             ai_generated=True,
             ai_prompt=topic,
-            ai_model="gemma4:26b" if "fallback" not in content else "fallback",
+            ai_model="gemma3:12b-it-q4_K_M" if "fallback" not in content else "fallback",
         )
         db.add(post)
         await db.commit()

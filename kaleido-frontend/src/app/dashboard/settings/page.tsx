@@ -23,7 +23,8 @@ export default function SettingsPage() {
           api.get("/referrals/code"),
         ]);
         if (meRes.status === "fulfilled") {
-          const u = meRes.value.data.data;
+          const raw = meRes.value.data.data;
+          const u = raw?.user || raw;
           setProfile({ full_name: u.full_name || "", email: u.email || "" });
           setCreatedAt(u.created_at || "");
           if (u.referral_code) setReferralCode(u.referral_code);

@@ -126,7 +126,7 @@ export default function DashboardPage() {
       try {
         // Fetch user info
         const userRes = await api.get("/auth/me");
-        setUser(userRes.data);
+        setUser(userRes.data.data?.user || userRes.data.data);
       } catch {
         // If auth fails, the interceptor handles redirect
       }
@@ -150,7 +150,15 @@ export default function DashboardPage() {
         ]);
 
       if (overviewResult.status === "fulfilled") {
-        setMetrics(overviewResult.value.data);
+        const overview = overviewResult.value.data.data || overviewResult.value.data;
+        setMetrics({
+          total_posts: overview.total_posts_published ?? overview.total_posts ?? 0,
+          scheduled_posts: overview.scheduled_posts ?? 0,
+          total_engagement: overview.total_engagement ?? 0,
+          growth_rate: overview.avg_engagement_rate ?? overview.growth_rate ?? 0,
+          engagement_trend: overview.engagement_trend,
+          growth_trend: overview.growth_trend,
+        });
       } else {
         setMetrics({
           total_posts: 0,
@@ -161,13 +169,13 @@ export default function DashboardPage() {
       }
 
       if (postsResult.status === "fulfilled") {
-        const data = postsResult.value.data;
-        setRecentPosts(Array.isArray(data) ? data : data.items || data.posts || []);
+        const payload = postsResult.value.data;
+        setRecentPosts(payload.data || []);
       }
 
       if (scheduleResult.status === "fulfilled") {
-        const data = scheduleResult.value.data;
-        setScheduledPosts(Array.isArray(data) ? data : data.items || data.events || []);
+        const payload = scheduleResult.value.data;
+        setScheduledPosts(payload.data || []);
       }
 
       setLoading(false);

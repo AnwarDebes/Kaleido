@@ -118,7 +118,7 @@ class ChatService:
         try:
             response = await ollama_client.generate_chat(
                 messages=chat_history,
-                model="gemma4:26b-a4b-q4_K_M",
+                model="gemma3:12b-it-q4_K_M",
             )
             ai_content = response if isinstance(response, str) else str(response)
         except Exception as e:
