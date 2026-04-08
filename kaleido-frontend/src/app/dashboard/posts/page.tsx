@@ -288,10 +288,10 @@ export default function PostsPage() {
 
   /* render */
   return (
-    <div className="min-h-screen px-4 py-8 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+    <div className="min-h-screen px-3 py-4 sm:px-6 sm:py-8 lg:px-8 max-w-6xl mx-auto">
       {/* header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <h1 className="text-3xl font-bold gradient-text">Posts</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Posts</h1>
         <div className="flex gap-3">
           <button
             onClick={() => setShowAIGenerate(true)}
@@ -426,42 +426,40 @@ export default function PostsPage() {
                   </div>
 
                   {/* actions */}
-                  <div className="flex gap-2 pt-3 border-t border-card-border">
+                  <div className="flex flex-wrap gap-1.5 pt-3 border-t border-card-border">
                     <button
                       onClick={() => openEditPost(post)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors"
                       title="Edit"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
-                      Edit
+                      <span className="hidden sm:inline">Edit</span>
                     </button>
                     <button
                       onClick={() => handleDelete(post.id)}
                       disabled={isActioning}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
                       title="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Delete
+                      <span className="hidden sm:inline">Delete</span>
                     </button>
                     {post.status === "draft" && (
                       <>
                         <button
                           onClick={() => {
-                            setEditingPost(post);
-                            /* navigate to schedule page or open schedule modal */
                             window.location.href = `/dashboard/schedule?post=${post.id}`;
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
                           title="Schedule"
                         >
                           <Calendar className="h-3.5 w-3.5" />
-                          Schedule
+                          <span className="hidden sm:inline">Schedule</span>
                         </button>
                         <button
                           onClick={() => handlePublishNow(post.id)}
                           disabled={isActioning}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
                           title="Publish Now"
                         >
                           {isActioning ? (
@@ -469,7 +467,7 @@ export default function PostsPage() {
                           ) : (
                             <Send className="h-3.5 w-3.5" />
                           )}
-                          Publish
+                          <span className="hidden sm:inline">Publish</span>
                         </button>
                       </>
                     )}
@@ -477,7 +475,7 @@ export default function PostsPage() {
                       <button
                         onClick={() => handlePublishNow(post.id)}
                         disabled={isActioning}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
                         title="Publish Now"
                       >
                         {isActioning ? (
@@ -485,7 +483,7 @@ export default function PostsPage() {
                         ) : (
                           <Send className="h-3.5 w-3.5" />
                         )}
-                        Publish
+                        <span className="hidden sm:inline">Publish</span>
                       </button>
                     )}
                   </div>
@@ -528,7 +526,7 @@ export default function PostsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm"
             onClick={(e) => {
               if (e.target === e.currentTarget) setShowEditor(false);
             }}
@@ -537,7 +535,7 @@ export default function PostsPage() {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="glass-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              className="glass-card p-5 sm:p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
             >
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-lg font-bold">
@@ -633,7 +631,7 @@ export default function PostsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm"
             onClick={(e) => {
               if (e.target === e.currentTarget) setShowAIGenerate(false);
             }}
@@ -642,7 +640,7 @@ export default function PostsPage() {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="glass-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              className="glass-card p-5 sm:p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
             >
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-lg font-bold flex items-center gap-2">

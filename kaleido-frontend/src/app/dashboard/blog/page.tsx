@@ -204,7 +204,7 @@ export default function BlogPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {view !== "list" && (
             <button
@@ -220,17 +220,17 @@ export default function BlogPage() {
           </h1>
         </div>
         {view === "list" && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={() => { setView("generate"); setError(""); }}
-              className="flex items-center gap-2 rounded-lg border border-amber-500/30 px-4 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-500/10 transition-colors"
+              className="flex items-center justify-center gap-2 rounded-lg border border-amber-500/30 px-4 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-500/10 transition-colors"
             >
               <Sparkles className="h-4 w-4" />
               Generate with AI
             </button>
             <button
               onClick={openNewPost}
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+              className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
             >
               <Plus className="h-4 w-4" />
               New Post

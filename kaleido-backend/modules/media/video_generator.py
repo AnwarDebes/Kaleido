@@ -32,7 +32,7 @@ class VideoGenerator:
 
         try:
             # Generate keyframes using Pollinations.ai with sequential seeds
-            num_keyframes = min(max(frames // 20, 3), 5)
+            num_keyframes = 3  # 3 frames is the sweet spot for speed vs quality
             base_seed = hash(prompt) % 100000
 
             encoded_prompt = quote(prompt)
@@ -52,9 +52,9 @@ class VideoGenerator:
                     except Exception as e:
                         logger.warning("video_frame_failed", frame=i, error=str(e))
                         results.append(e)
-                    # Small delay to avoid rate limiting
+                    # Delay to avoid rate limiting (Pollinations free tier)
                     if i < num_keyframes - 1:
-                        await asyncio.sleep(1.5)
+                        await asyncio.sleep(3)
 
             # Check we got enough frames
             valid_frames = [r for r in results if isinstance(r, str)]
@@ -124,11 +124,11 @@ class VideoGenerator:
         client: httpx.AsyncClient, url: str, work_dir: str, index: int
     ) -> str:
         """Download a single frame image with retry on rate limit."""
-        for attempt in range(3):
+        for attempt in range(4):
             resp = await client.get(url)
             if resp.status_code == 429:
-                wait = 2 ** attempt + 1
-                logger.info("rate_limited_retrying", frame=index, wait=wait)
+                wait = 5 * (attempt + 1)
+                logger.info("rate_limited_retrying", frame=index, wait=wait, attempt=attempt)
                 await asyncio.sleep(wait)
                 continue
             resp.raise_for_status()

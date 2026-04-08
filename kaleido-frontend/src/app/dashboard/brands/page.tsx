@@ -96,9 +96,9 @@ export default function BrandsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Brands</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Brands</h1>
           <p className="text-sm text-muted">Manage your brand profiles for personalized content</p>
         </div>
         <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow">
@@ -148,8 +148,8 @@ export default function BrandsPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="glass-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4">
+          <div className="glass-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{editing ? "Edit Brand" : "Create Brand"}</h2>
               <button onClick={() => setShowForm(false)} className="text-muted hover:text-foreground"><X className="h-5 w-5" /></button>

@@ -352,7 +352,7 @@ export default function CampaignsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
               onClick={() => !generatingPlan && setShowPlanModal(false)}
             >
               <motion.div
@@ -360,7 +360,7 @@ export default function CampaignsPage() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="glass-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
+                className="glass-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
               >
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -539,7 +539,7 @@ export default function CampaignsPage() {
       </div>
 
       {/* Status filter */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { label: "All", value: "" },
           { label: "Draft", value: "draft" },
@@ -696,7 +696,7 @@ export default function CampaignsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
             onClick={() => !creating && setShowCreate(false)}
           >
             <motion.div
@@ -704,7 +704,7 @@ export default function CampaignsPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-card w-full max-w-lg p-6"
+              className="glass-card w-full max-w-lg p-6 rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">

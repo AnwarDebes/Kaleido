@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Search,
   ChevronRight,
+  Filter,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -31,6 +32,7 @@ interface MediaItem {
   width?: number;
   height?: number;
   ai_generated?: boolean;
+  ai_prompt?: string;
   folder: string;
   tags: string[] | null;
   created_at: string;
@@ -49,6 +51,8 @@ interface PaginationMeta {
   total_pages: number;
 }
 
+type GenType = "image" | "video";
+
 export default function MediaPage() {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -61,11 +65,11 @@ export default function MediaPage() {
 
   // Upload state
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // AI Generate modal
   const [showGenerate, setShowGenerate] = useState(false);
+  const [genType, setGenType] = useState<GenType>("image");
   const [generating, setGenerating] = useState(false);
   const [genPrompt, setGenPrompt] = useState("");
   const [genStyle, setGenStyle] = useState("");
@@ -77,6 +81,9 @@ export default function MediaPage() {
   // New folder
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+
+  // Mobile filter toggle
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const fetchMedia = useCallback(async () => {
     setLoading(true);
@@ -116,7 +123,7 @@ export default function MediaPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    setUploadError("");
+    setError("");
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -127,28 +134,37 @@ export default function MediaPage() {
       fetchMedia();
       fetchFolders();
     } catch {
-      setUploadError("Upload failed. Please try again.");
+      setError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  async function handleGenerateImage() {
+  async function handleGenerate() {
     if (!genPrompt.trim()) return;
     setGenerating(true);
+    setError("");
     try {
-      const body: Record<string, string> = { prompt: genPrompt };
-      if (genStyle) body.style = genStyle;
-      if (genAspectRatio) body.aspect_ratio = genAspectRatio;
-      await api.post("/media/generate-image", body);
+      if (genType === "image") {
+        const body: Record<string, string> = { prompt: genPrompt };
+        if (genStyle) body.style = genStyle;
+        if (genAspectRatio) body.aspect_ratio = genAspectRatio;
+        await api.post("/media/generate-image", body);
+      } else {
+        await api.post("/media/generate-video", { prompt: genPrompt });
+      }
       setShowGenerate(false);
       setGenPrompt("");
       setGenStyle("");
       setGenAspectRatio("1:1");
       fetchMedia();
     } catch {
-      setUploadError("Image generation failed. Please try again.");
+      setError(
+        genType === "image"
+          ? "Image generation failed. Please try again."
+          : "Video generation failed. Please try again."
+      );
     } finally {
       setGenerating(false);
     }
@@ -182,13 +198,22 @@ export default function MediaPage() {
   }
 
   function isVideo(item: MediaItem): boolean {
-    return item.file_type?.startsWith("video") || /\.(mp4|webm|mov|avi)$/i.test(item.filename);
+    return (
+      item.file_type?.startsWith("video") ||
+      /\.(mp4|webm|mov|avi)$/i.test(item.filename)
+    );
   }
 
-  // Loading skeleton
+  function formatSize(bytes?: number): string {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   function Skeleton() {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
         {Array.from({ length: 10 }).map((_, i) => (
           <div
             key={i}
@@ -201,28 +226,150 @@ export default function MediaPage() {
     );
   }
 
+  /* --- Sidebar content (reused for desktop sidebar and mobile drawer) --- */
+  function FilterContent() {
+    return (
+      <>
+        <div className="space-y-1">
+          <h3 className="text-xs font-semibold uppercase text-muted mb-3 tracking-wider">
+            Folders
+          </h3>
+          <button
+            onClick={() => {
+              setSelectedFolder(null);
+              setPage(1);
+              setShowMobileFilters(false);
+            }}
+            className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+              !selectedFolder
+                ? "bg-amber-500/10 text-amber-600 font-medium"
+                : "text-muted hover:bg-amber-500/5 hover:text-foreground"
+            }`}
+          >
+            <FolderOpen className="h-4 w-4" />
+            All Media
+          </button>
+          {folders.map((folder) => (
+            <button
+              key={folder.name}
+              onClick={() => {
+                setSelectedFolder(folder.name);
+                setPage(1);
+                setShowMobileFilters(false);
+              }}
+              className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                selectedFolder === folder.name
+                  ? "bg-amber-500/10 text-amber-600 font-medium"
+                  : "text-muted hover:bg-amber-500/5 hover:text-foreground"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                {folder.name}
+              </span>
+              <span className="text-[10px] text-muted">{folder.file_count}</span>
+            </button>
+          ))}
+          {showNewFolder ? (
+            <div className="flex gap-1 mt-2">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                placeholder="Folder name"
+                className="flex-1 rounded-lg border border-card-border bg-background px-2 py-1.5 text-xs outline-none focus:border-amber-500"
+                autoFocus
+              />
+              <button
+                onClick={handleCreateFolder}
+                className="rounded-lg bg-amber-500/10 p-1.5 text-amber-600 hover:bg-amber-500/20"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowNewFolder(true)}
+              className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:bg-amber-500/5 hover:text-foreground transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Folder
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase text-muted mb-3 tracking-wider">
+            Type
+          </h3>
+          <div className="space-y-1">
+            {[
+              { label: "All", value: "", icon: <Search className="h-4 w-4" /> },
+              {
+                label: "Images",
+                value: "image",
+                icon: <FileImage className="h-4 w-4" />,
+              },
+              {
+                label: "Videos",
+                value: "video",
+                icon: <Film className="h-4 w-4" />,
+              },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  setFileTypeFilter(opt.value);
+                  setPage(1);
+                  setShowMobileFilters(false);
+                }}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  fileTypeFilter === opt.value
+                    ? "bg-amber-500/10 text-amber-600 font-medium"
+                    : "text-muted hover:bg-amber-500/5 hover:text-foreground"
+                }`}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Media Library</h1>
-          <p className="text-sm text-muted mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold">Media Library</h1>
+          <p className="text-xs sm:text-sm text-muted mt-1">
             Manage your images, videos, and AI-generated content
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile filter toggle */}
+          <button
+            onClick={() => setShowMobileFilters(true)}
+            className="md:hidden inline-flex items-center gap-2 rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm font-medium hover:border-amber-500/30 transition-colors"
+          >
+            <Filter className="h-4 w-4" />
+          </button>
           <button
             onClick={() => setShowGenerate(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
           >
             <Sparkles className="h-4 w-4" />
-            AI Generate
+            <span className="hidden sm:inline">AI Generate</span>
+            <span className="sm:hidden">Generate</span>
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm font-medium hover:border-amber-500/30 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-card-border bg-card-bg px-3 sm:px-4 py-2.5 text-sm font-medium hover:border-amber-500/30 transition-colors disabled:opacity-50"
           >
             {uploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -241,115 +388,25 @@ export default function MediaPage() {
         </div>
       </div>
 
-      {/* Error banners */}
-      {(error || uploadError) && (
+      {/* Error */}
+      {error && (
         <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-600 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          {error || uploadError}
+          {error}
+          <button
+            onClick={() => setError("")}
+            className="ml-auto hover:text-red-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
       <div className="flex gap-6">
-        {/* Folder sidebar */}
-        <div className="hidden md:block w-56 shrink-0 space-y-2">
-          <div className="glass-card p-4 space-y-1">
-            <h3 className="text-xs font-semibold uppercase text-muted mb-3 tracking-wider">
-              Folders
-            </h3>
-            <button
-              onClick={() => {
-                setSelectedFolder(null);
-                setPage(1);
-              }}
-              className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                !selectedFolder
-                  ? "bg-amber-500/10 text-amber-600 font-medium"
-                  : "text-muted hover:bg-amber-500/5 hover:text-foreground"
-              }`}
-            >
-              <FolderOpen className="h-4 w-4" />
-              All Media
-            </button>
-            {folders.map((folder) => (
-              <button
-                key={folder.name}
-                onClick={() => {
-                  setSelectedFolder(folder.name);
-                  setPage(1);
-                }}
-                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  selectedFolder === folder.name
-                    ? "bg-amber-500/10 text-amber-600 font-medium"
-                    : "text-muted hover:bg-amber-500/5 hover:text-foreground"
-                }`}
-              >
-                <FolderOpen className="h-4 w-4" />
-                {folder.name}
-              </button>
-            ))}
-            {showNewFolder ? (
-              <div className="flex gap-1 mt-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
-                  placeholder="Folder name"
-                  className="flex-1 rounded-lg border border-card-border bg-background px-2 py-1.5 text-xs outline-none focus:border-amber-500"
-                  autoFocus
-                />
-                <button
-                  onClick={handleCreateFolder}
-                  className="rounded-lg bg-amber-500/10 p-1.5 text-amber-600 hover:bg-amber-500/20"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowNewFolder(true)}
-                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:bg-amber-500/5 hover:text-foreground transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New Folder
-              </button>
-            )}
-          </div>
-
-          {/* File type filter */}
-          <div className="glass-card p-4">
-            <h3 className="text-xs font-semibold uppercase text-muted mb-3 tracking-wider">
-              Type
-            </h3>
-            <div className="space-y-1">
-              {[
-                { label: "All", value: "" },
-                { label: "Images", value: "image" },
-                { label: "Videos", value: "video" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    setFileTypeFilter(opt.value);
-                    setPage(1);
-                  }}
-                  className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                    fileTypeFilter === opt.value
-                      ? "bg-amber-500/10 text-amber-600 font-medium"
-                      : "text-muted hover:bg-amber-500/5 hover:text-foreground"
-                  }`}
-                >
-                  {opt.value === "image" ? (
-                    <FileImage className="h-4 w-4" />
-                  ) : opt.value === "video" ? (
-                    <Film className="h-4 w-4" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+        {/* Desktop sidebar */}
+        <div className="hidden md:block w-56 shrink-0">
+          <div className="glass-card p-4 sticky top-4">
+            <FilterContent />
           </div>
         </div>
 
@@ -361,26 +418,26 @@ export default function MediaPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="glass-card p-12 text-center"
+              className="glass-card p-8 sm:p-12 text-center"
             >
               <div className="mx-auto h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
                 <ImageIcon className="h-8 w-8 text-amber-500" />
               </div>
               <h3 className="text-lg font-semibold mb-2">No media yet</h3>
               <p className="text-sm text-muted max-w-sm mx-auto">
-                No media yet. Upload or generate your first image!
+                Upload or generate your first image or video!
               </p>
-              <div className="flex items-center justify-center gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-card-border bg-card-bg px-4 py-2 text-sm font-medium hover:border-amber-500/30 transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-card-border bg-card-bg px-4 py-2 text-sm font-medium hover:border-amber-500/30 transition-colors"
                 >
                   <Upload className="h-4 w-4" />
                   Upload
                 </button>
                 <button
                   onClick={() => setShowGenerate(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
                 >
                   <Sparkles className="h-4 w-4" />
                   AI Generate
@@ -389,7 +446,7 @@ export default function MediaPage() {
             </motion.div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {media.map((item) => (
                   <motion.div
                     key={item.id}
@@ -401,7 +458,9 @@ export default function MediaPage() {
                     <div className="aspect-square relative bg-amber-500/5">
                       {isVideo(item) ? (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <Film className="h-10 w-10 text-amber-500/50" />
+                          <div className="h-12 w-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                            <Film className="h-6 w-6 text-white" />
+                          </div>
                         </div>
                       ) : (
                         <img
@@ -422,23 +481,42 @@ export default function MediaPage() {
                           {isVideo(item) ? "Video" : "Image"}
                         </span>
                       </div>
+                      {item.ai_generated && (
+                        <div className="absolute top-2 right-2">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/80 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            AI
+                          </span>
+                        </div>
+                      )}
                       {/* Delete button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDelete(item.id);
                         }}
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 rounded-md bg-red-500/80 backdrop-blur-sm p-1.5 text-white hover:bg-red-600 transition-all"
+                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 rounded-md bg-red-500/80 backdrop-blur-sm p-1.5 text-white hover:bg-red-600 transition-all"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="p-3">
+                    <div className="p-2 sm:p-3">
                       <p className="text-xs font-medium truncate">
-                        {item.filename}
+                        {item.ai_prompt
+                          ? item.ai_prompt.slice(0, 30) +
+                            (item.ai_prompt.length > 30 ? "..." : "")
+                          : item.filename}
                       </p>
-                      <p className="text-[10px] text-muted mt-0.5">
-                        {new Date(item.created_at).toLocaleDateString()}
+                      <p className="text-[10px] text-muted mt-0.5 flex items-center gap-1">
+                        <span>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                        {item.file_size && (
+                          <>
+                            <span>·</span>
+                            <span>{formatSize(item.file_size)}</span>
+                          </>
+                        )}
                       </p>
                     </div>
                   </motion.div>
@@ -456,7 +534,7 @@ export default function MediaPage() {
                     Previous
                   </button>
                   <span className="text-sm text-muted px-3">
-                    Page {page} of {pagination.total_pages}
+                    {page} / {pagination.total_pages}
                   </span>
                   <button
                     disabled={page >= pagination.total_pages}
@@ -472,6 +550,41 @@ export default function MediaPage() {
         </div>
       </div>
 
+      {/* Mobile filter drawer */}
+      <AnimatePresence>
+        {showMobileFilters && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 md:hidden"
+          >
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowMobileFilters(false)}
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25 }}
+              className="absolute left-0 top-0 bottom-0 w-72 bg-background p-4 shadow-xl overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Filters</h3>
+                <button
+                  onClick={() => setShowMobileFilters(false)}
+                  className="p-1 rounded-lg hover:bg-stone-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <FilterContent />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* AI Generate Modal */}
       <AnimatePresence>
         {showGenerate && (
@@ -479,25 +592,25 @@ export default function MediaPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
             onClick={() => !generating && setShowGenerate(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-card w-full max-w-lg p-6"
+              className="glass-card w-full sm:max-w-lg p-5 sm:p-6 rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                     <Sparkles className="h-5 w-5 text-amber-500" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold">AI Image Generation</h2>
+                    <h2 className="text-lg font-bold">AI Generation</h2>
                     <p className="text-xs text-muted">
-                      Describe the image you want to create
+                      Create images or videos with AI
                     </p>
                   </div>
                 </div>
@@ -510,6 +623,33 @@ export default function MediaPage() {
               </div>
 
               <div className="space-y-4">
+                {/* Type toggle */}
+                <div className="flex gap-1 p-1 rounded-xl bg-stone-100 dark:bg-stone-800">
+                  <button
+                    onClick={() => setGenType("image")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      genType === "image"
+                        ? "bg-white dark:bg-stone-700 shadow-sm text-foreground"
+                        : "text-muted"
+                    }`}
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Image
+                  </button>
+                  <button
+                    onClick={() => setGenType("video")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      genType === "video"
+                        ? "bg-white dark:bg-stone-700 shadow-sm text-foreground"
+                        : "text-muted"
+                    }`}
+                  >
+                    <Film className="h-4 w-4" />
+                    Video
+                  </button>
+                </div>
+
+                {/* Prompt */}
                 <div>
                   <label className="block text-sm font-medium mb-1.5">
                     Prompt
@@ -518,62 +658,79 @@ export default function MediaPage() {
                     value={genPrompt}
                     onChange={(e) => setGenPrompt(e.target.value)}
                     rows={3}
-                    placeholder="A futuristic city skyline at sunset with neon lights..."
+                    placeholder={
+                      genType === "image"
+                        ? "A futuristic city skyline at sunset with neon lights..."
+                        : "Ocean waves gently crashing on a tropical beach..."
+                    }
                     className="w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors resize-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">
-                      Style
-                    </label>
-                    <select
-                      value={genStyle}
-                      onChange={(e) => setGenStyle(e.target.value)}
-                      className="w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
-                    >
-                      <option value="">Auto</option>
-                      <option value="photorealistic">Photorealistic</option>
-                      <option value="digital-art">Digital Art</option>
-                      <option value="anime">Anime</option>
-                      <option value="oil-painting">Oil Painting</option>
-                      <option value="watercolor">Watercolor</option>
-                      <option value="3d-render">3D Render</option>
-                      <option value="minimalist">Minimalist</option>
-                    </select>
+                {/* Image-specific options */}
+                {genType === "image" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">
+                        Style
+                      </label>
+                      <select
+                        value={genStyle}
+                        onChange={(e) => setGenStyle(e.target.value)}
+                        className="w-full rounded-lg border border-card-border bg-background px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                      >
+                        <option value="">Auto</option>
+                        <option value="photorealistic">Photorealistic</option>
+                        <option value="illustration">Illustration</option>
+                        <option value="minimal">Minimalist</option>
+                        <option value="flat">Flat Design</option>
+                        <option value="watercolor">Watercolor</option>
+                        <option value="cinematic">Cinematic</option>
+                        <option value="3d">3D Render</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">
+                        Aspect Ratio
+                      </label>
+                      <select
+                        value={genAspectRatio}
+                        onChange={(e) => setGenAspectRatio(e.target.value)}
+                        className="w-full rounded-lg border border-card-border bg-background px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                      >
+                        <option value="1:1">1:1 Square</option>
+                        <option value="16:9">16:9 Landscape</option>
+                        <option value="9:16">9:16 Portrait</option>
+                        <option value="4:5">4:5 Instagram</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">
-                      Aspect Ratio
-                    </label>
-                    <select
-                      value={genAspectRatio}
-                      onChange={(e) => setGenAspectRatio(e.target.value)}
-                      className="w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
-                    >
-                      <option value="1:1">1:1 (Square)</option>
-                      <option value="16:9">16:9 (Landscape)</option>
-                      <option value="9:16">9:16 (Portrait)</option>
-                      <option value="4:3">4:3 (Standard)</option>
-                    </select>
+                )}
+
+                {genType === "video" && (
+                  <div className="rounded-lg bg-amber-500/5 border border-amber-500/10 px-4 py-3 text-xs text-muted">
+                    Video generation creates AI keyframe images and stitches them
+                    into a smooth video with Ken Burns effect. This may take 30-60
+                    seconds.
                   </div>
-                </div>
+                )}
 
                 <button
-                  onClick={handleGenerateImage}
+                  onClick={handleGenerate}
                   disabled={generating || !genPrompt.trim()}
                   className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {generating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
+                      {genType === "image"
+                        ? "Generating Image..."
+                        : "Generating Video..."}
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Generate Image
+                      Generate {genType === "image" ? "Image" : "Video"}
                     </>
                   )}
                 </button>
@@ -590,7 +747,7 @@ export default function MediaPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4"
             onClick={() => setPreviewItem(null)}
           >
             <motion.div
@@ -598,7 +755,7 @@ export default function MediaPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative max-w-4xl max-h-[90vh] w-full"
+              className="relative w-full max-w-4xl max-h-[90vh]"
             >
               <button
                 onClick={() => setPreviewItem(null)}
@@ -606,12 +763,13 @@ export default function MediaPage() {
               >
                 <X className="h-6 w-6" />
               </button>
-              <div className="glass-card overflow-hidden">
+              <div className="glass-card overflow-hidden rounded-xl">
                 {isVideo(previewItem) ? (
                   <video
                     src={mediaUrl(previewItem)}
                     controls
-                    className="w-full max-h-[70vh] object-contain"
+                    autoPlay
+                    className="w-full max-h-[70vh] object-contain bg-black"
                   />
                 ) : (
                   <img
@@ -620,15 +778,23 @@ export default function MediaPage() {
                     className="w-full max-h-[70vh] object-contain"
                   />
                 )}
-                <div className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">
-                      {previewItem.filename}
+                <div className="p-3 sm:p-4 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">
+                      {previewItem.ai_prompt || previewItem.filename}
                     </p>
-                    <p className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                    <p className="text-xs text-muted mt-0.5 flex items-center gap-2 flex-wrap">
                       <span>
                         {new Date(previewItem.created_at).toLocaleDateString()}
                       </span>
+                      {previewItem.file_size && (
+                        <span>{formatSize(previewItem.file_size)}</span>
+                      )}
+                      {previewItem.width && previewItem.height && (
+                        <span>
+                          {previewItem.width}x{previewItem.height}
+                        </span>
+                      )}
                       {previewItem.folder && (
                         <>
                           <ChevronRight className="h-3 w-3" />
@@ -636,22 +802,10 @@ export default function MediaPage() {
                         </>
                       )}
                     </p>
-                    {previewItem.tags && previewItem.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {previewItem.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                   <button
                     onClick={() => handleDelete(previewItem.id)}
-                    className="rounded-lg bg-red-500/10 p-2 text-red-500 hover:bg-red-500/20 transition-colors"
+                    className="shrink-0 rounded-lg bg-red-500/10 p-2 text-red-500 hover:bg-red-500/20 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

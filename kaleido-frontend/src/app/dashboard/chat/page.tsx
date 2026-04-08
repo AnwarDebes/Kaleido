@@ -119,7 +119,7 @@ export default function ChatPage() {
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [sending, setSending] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(typeof window !== "undefined" ? window.innerWidth >= 640 : true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -226,7 +226,7 @@ export default function ChatPage() {
     "w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors";
 
   return (
-    <div className="flex h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl">
+    <div className="flex h-[calc(100vh-4rem)] sm:h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl">
       {/* Conversation sidebar */}
       <AnimatePresence>
         {showSidebar && (
@@ -352,7 +352,7 @@ export default function ChatPage() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-3 sm:px-4 py-3 text-sm leading-relaxed ${
                     msg.role === "user"
                       ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-br-md"
                       : "glass-card rounded-bl-md"
