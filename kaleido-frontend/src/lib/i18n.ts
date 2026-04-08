@@ -120,8 +120,8 @@ export const translations = {
         },
         {
           name: "Pro",
-          price: "29",
-          yearlyPrice: "23",
+          price: "1",
+          yearlyPrice: "0.8",
           description: "For creators and small businesses",
           features: [
             "10 social accounts",
@@ -139,8 +139,8 @@ export const translations = {
         },
         {
           name: "Business",
-          price: "79",
-          yearlyPrice: "63",
+          price: "2.5",
+          yearlyPrice: "2",
           description: "For teams and agencies",
           features: [
             "Unlimited social accounts",
@@ -328,8 +328,8 @@ export const translations = {
         },
         {
           name: "Pro",
-          price: "249",
-          yearlyPrice: "199",
+          price: "10",
+          yearlyPrice: "8",
           description: "For skapere og smabedrifter",
           features: [
             "10 sosiale kontoer",
@@ -347,8 +347,8 @@ export const translations = {
         },
         {
           name: "Bedrift",
-          price: "699",
-          yearlyPrice: "559",
+          price: "25",
+          yearlyPrice: "20",
           description: "For team og byraer",
           features: [
             "Ubegrensede sosiale kontoer",
@@ -525,8 +525,8 @@ export const translations = {
         },
         {
           name: "\u0628\u0631\u0648",
-          price: "29",
-          yearlyPrice: "23",
+          price: "1",
+          yearlyPrice: "0.8",
           description: "\u0644\u0644\u0645\u0628\u062f\u0639\u064a\u0646 \u0648\u0627\u0644\u0634\u0631\u0643\u0627\u062a \u0627\u0644\u0635\u063a\u064a\u0631\u0629",
           features: [
             "10 \u062d\u0633\u0627\u0628\u0627\u062a \u0627\u062c\u062a\u0645\u0627\u0639\u064a\u0629",
@@ -544,8 +544,8 @@ export const translations = {
         },
         {
           name: "\u0623\u0639\u0645\u0627\u0644",
-          price: "79",
-          yearlyPrice: "63",
+          price: "2.5",
+          yearlyPrice: "2",
           description: "\u0644\u0644\u0641\u0631\u0642 \u0648\u0627\u0644\u0648\u0643\u0627\u0644\u0627\u062a",
           features: [
             "\u062d\u0633\u0627\u0628\u0627\u062a \u063a\u064a\u0631 \u0645\u062d\u062f\u0648\u062f\u0629",
