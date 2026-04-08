@@ -17,7 +17,7 @@ class OllamaClient:
         self,
         prompt: str,
         system: str = "",
-        model: str = "gemma4:26b-a4b-q4_K_M",
+        model: str = "gemma3:12b-it-q4_K_M",
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
@@ -48,7 +48,7 @@ class OllamaClient:
     async def generate_chat(
         self,
         messages: list[dict],
-        model: str = "gemma4:26b-a4b-q4_K_M",
+        model: str = "gemma3:12b-it-q4_K_M",
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
@@ -73,7 +73,7 @@ class OllamaClient:
         self,
         prompt: str,
         system: str = "",
-        model: str = "gemma4:26b-a4b-q4_K_M",
+        model: str = "gemma3:12b-it-q4_K_M",
         temperature: float = 0.3,
     ) -> dict:
         """Generate a JSON response from the model."""
@@ -96,7 +96,7 @@ class OllamaClient:
     async def stream_chat(
         self,
         messages: list[dict],
-        model: str = "gemma4:26b-a4b-q4_K_M",
+        model: str = "gemma3:12b-it-q4_K_M",
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
         """Stream chat response tokens."""
