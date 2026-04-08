@@ -24,16 +24,22 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 interface MediaItem {
   id: string;
   filename: string;
-  file_path: string;
+  file_url: string | null;
   file_type: string;
-  folder: string | null;
-  tags: string[];
+  mime_type?: string;
+  file_size?: number;
+  width?: number;
+  height?: number;
+  ai_generated?: boolean;
+  folder: string;
+  tags: string[] | null;
   created_at: string;
-  url?: string;
 }
 
 interface Folder {
+  path: string;
   name: string;
+  file_count: number;
 }
 
 interface PaginationMeta {
@@ -171,7 +177,8 @@ export default function MediaPage() {
   }
 
   function mediaUrl(item: MediaItem): string {
-    return `${API_URL}/v1/media/files/${item.file_path}`;
+    if (item.file_url) return `${API_URL}/v1${item.file_url}`;
+    return `${API_URL}/v1/media/files/${item.filename}`;
   }
 
   function isVideo(item: MediaItem): boolean {
