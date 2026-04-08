@@ -20,14 +20,18 @@ import {
 import { api } from "@/lib/api";
 
 interface OverviewData {
-  total_posts: number;
-  total_engagement: number;
-  avg_engagement_rate: number;
-  best_platform: string | null;
-  likes: number;
-  comments: number;
-  shares: number;
-  views: number;
+  total_posts_published?: number;
+  total_posts?: number;
+  total_engagement?: number;
+  total_followers?: number;
+  total_reach?: number;
+  avg_engagement_rate?: number;
+  best_platform?: string | null;
+  platform_breakdown?: Record<string, { followers: number; reach: number; engagement: number }>;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  views?: number;
 }
 
 interface GrowthDataPoint {
@@ -72,7 +76,8 @@ const PLATFORMS = [
   { label: "YouTube", value: "youtube" },
 ];
 
-function formatNumber(num: number): string {
+function formatNumber(num: number | null | undefined): string {
+  if (num == null) return "0";
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
   if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
   return num.toString();
@@ -430,7 +435,7 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {formatNumber(overview.total_posts)}
+                  {formatNumber(overview.total_posts_published ?? overview.total_posts)}
                 </p>
               </motion.div>
 
@@ -447,7 +452,7 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {formatNumber(overview.total_engagement)}
+                  {formatNumber(overview.total_engagement ?? 0)}
                 </p>
               </motion.div>
 
@@ -466,7 +471,7 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {(overview.avg_engagement_rate * 100).toFixed(2)}%
+                  {((overview.avg_engagement_rate ?? 0) * 100).toFixed(2)}%
                 </p>
               </motion.div>
 
@@ -494,23 +499,23 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 {
-                  label: "Likes",
-                  value: overview.likes,
+                  label: "Followers",
+                  value: overview.total_followers ?? 0,
                   icon: ThumbsUp,
                 },
                 {
-                  label: "Comments",
-                  value: overview.comments,
+                  label: "Reach",
+                  value: overview.total_reach ?? 0,
                   icon: MessageSquare,
                 },
                 {
-                  label: "Shares",
-                  value: overview.shares,
+                  label: "Engagement",
+                  value: overview.total_engagement ?? 0,
                   icon: Share2,
                 },
                 {
-                  label: "Views",
-                  value: overview.views,
+                  label: "Posts",
+                  value: overview.total_posts_published ?? overview.total_posts ?? 0,
                   icon: Eye,
                 },
               ].map((stat) => (
@@ -569,13 +574,13 @@ export default function AnalyticsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {post.engagement_rate > 0 ? (
+                        {(post.engagement_rate ?? 0) > 0 ? (
                           <ArrowUp className="h-3 w-3 text-green-500" />
                         ) : (
                           <ArrowDown className="h-3 w-3 text-red-400" />
                         )}
                         <span className="text-xs font-semibold">
-                          {(post.engagement_rate * 100).toFixed(1)}%
+                          {((post.engagement_rate ?? 0) * 100).toFixed(1)}%
                         </span>
                       </div>
                     </div>
