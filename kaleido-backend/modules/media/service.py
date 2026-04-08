@@ -138,6 +138,7 @@ class MediaService:
             file_size=file_info.get("file_size"),
             width=file_info.get("width"),
             height=file_info.get("height"),
+            duration_seconds=file_info.get("duration_seconds"),
             ai_generated=True,
             ai_prompt=file_info.get("ai_prompt"),
             ai_model=file_info.get("ai_model"),

@@ -4,6 +4,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from config.database import engine
@@ -108,6 +109,11 @@ app.include_router(newsletter_router, prefix="/v1")
 app.include_router(chat_router, prefix="/v1")
 app.include_router(integrations_router, prefix="/v1")
 app.include_router(referral_router, prefix="/v1")
+
+# --- Static media files ---
+import os
+os.makedirs(settings.media_root, exist_ok=True)
+app.mount("/media/files", StaticFiles(directory=settings.media_root), name="media")
 
 
 # --- Health Endpoints ---
