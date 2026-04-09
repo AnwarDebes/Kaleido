@@ -1,11 +1,13 @@
+import asyncio
 import os
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.database import get_db
+from config.database import get_db, async_session
 from config.settings import settings
 from core.security import get_current_user
 from modules.auth.models import User
@@ -21,7 +23,12 @@ from modules.media.schemas import (
 )
 from modules.media.service import MediaService
 
+logger = structlog.get_logger()
+
 router = APIRouter(prefix="/media", tags=["Media"])
+
+# In-memory job tracker for video generation
+_video_jobs: dict[str, dict] = {}
 
 
 @router.get("")
@@ -99,29 +106,85 @@ async def generate_image(
     }
 
 
+async def _run_video_generation(job_id: str, user_id: uuid.UUID, data: GenerateVideoRequest):
+    """Background task that generates video and saves to DB."""
+    fps = 16
+    frames = data.duration * fps + 1
+
+    try:
+        file_info = await VideoGenerator.generate_video(
+            prompt=data.prompt,
+            width=data.width,
+            height=data.height,
+            frames=frames,
+            fps=fps,
+        )
+
+        async with async_session() as db:
+            media = await MediaService.save_generated_media(
+                db, user_id, file_info, folder=data.folder, tags=data.tags
+            )
+            _video_jobs[job_id] = {
+                "status": "completed",
+                "data": MediaUploadResponse.model_validate(media).model_dump(),
+            }
+            logger.info("video_job_completed", job_id=job_id)
+
+    except Exception as e:
+        logger.error("video_job_failed", job_id=job_id, error=str(e))
+        _video_jobs[job_id] = {
+            "status": "failed",
+            "error": str(e),
+        }
+
+
 @router.post("/generate-video")
 async def generate_video(
     data: GenerateVideoRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
-    # Always 16fps, always max frames. No quality compromise.
+    """Start video generation as a background job. Returns job_id to poll."""
+    job_id = str(uuid.uuid4())
     fps = 16
     frames = data.duration * fps + 1
-    file_info = await VideoGenerator.generate_video(
-        prompt=data.prompt,
-        width=data.width,
-        height=data.height,
-        frames=frames,
-        fps=fps,
-    )
-    media = await MediaService.save_generated_media(
-        db, user.id, file_info, folder=data.folder, tags=data.tags
-    )
+    est_seconds = round((frames / 33) * 95)
+
+    _video_jobs[job_id] = {"status": "generating"}
+
+    asyncio.create_task(_run_video_generation(job_id, user.id, data))
+
     return {
         "success": True,
-        "data": MediaUploadResponse.model_validate(media).model_dump(),
+        "data": {
+            "job_id": job_id,
+            "status": "generating",
+            "frames": frames,
+            "fps": fps,
+            "estimated_seconds": est_seconds,
+        },
     }
+
+
+@router.get("/generate-video/status/{job_id}")
+async def video_generation_status(
+    job_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Poll for video generation status."""
+    job = _video_jobs.get(job_id)
+    if not job:
+        return {"success": False, "error": {"message": "Job not found"}}
+
+    if job["status"] == "completed":
+        # Clean up after delivering result
+        result = _video_jobs.pop(job_id)
+        return {"success": True, "data": {**result}}
+
+    if job["status"] == "failed":
+        result = _video_jobs.pop(job_id)
+        return {"success": False, "error": {"message": result.get("error", "Generation failed")}}
+
+    return {"success": True, "data": {"status": "generating"}}
 
 
 @router.get("/folders")

@@ -222,35 +222,60 @@ export default function MediaPage() {
     setGenElapsed(0);
     genTimerRef.current = setInterval(() => setGenElapsed((t) => t + 1), 1000);
     try {
-      let res;
       if (genType === "image") {
         const body: Record<string, string> = { prompt: genPrompt };
         if (genStyle) body.style = genStyle;
         if (genAspectRatio) body.aspect_ratio = genAspectRatio;
-        res = await api.post("/media/generate-image", body);
+        const res = await api.post("/media/generate-image", body);
+        setShowGenerate(false);
+        setGenPrompt("");
+        setGenStyle("");
+        setGenAspectRatio("1:1");
+        fetchMedia();
+        const generated = res.data.data;
+        if (generated) setPreviewItem(generated);
       } else {
-        // Video generation can take up to 10 minutes for max quality
-        res = await api.post("/media/generate-video", {
+        // Start video job — returns immediately with job_id
+        const startRes = await api.post("/media/generate-video", {
           prompt: genPrompt,
           duration: genDuration,
-        }, { timeout: 600000 });
+        });
+        const jobId = startRes.data.data?.job_id;
+        if (!jobId) throw new Error("No job ID returned");
+
+        // Poll for completion
+        const pollResult = await new Promise<MediaItem>((resolve, reject) => {
+          const poll = async () => {
+            try {
+              const statusRes = await api.get(`/media/generate-video/status/${jobId}`);
+              const d = statusRes.data;
+              if (d.success && d.data?.status === "completed") {
+                resolve(d.data.data);
+              } else if (!d.success || d.data?.status === "failed") {
+                reject(new Error(d.error?.message || "Video generation failed"));
+              } else {
+                // Still generating — poll again in 3s
+                setTimeout(poll, 3000);
+              }
+            } catch (err) {
+              reject(err);
+            }
+          };
+          setTimeout(poll, 3000);
+        });
+
+        setShowGenerate(false);
+        setGenPrompt("");
+        setGenDuration(2);
+        fetchMedia();
+        if (pollResult) setPreviewItem(pollResult);
       }
-      setShowGenerate(false);
-      setGenPrompt("");
-      setGenStyle("");
-      setGenAspectRatio("1:1");
-      setGenDuration(2);
-      fetchMedia();
-      // Auto-preview the generated item
-      const generated = res.data.data;
-      if (generated) {
-        setPreviewItem(generated);
-      }
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Generation failed";
       setError(
         genType === "image"
           ? "Image generation failed. Please try again."
-          : "Video generation failed. Please try again."
+          : `Video generation failed: ${msg}`
       );
     } finally {
       setGenerating(false);
