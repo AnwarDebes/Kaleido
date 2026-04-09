@@ -205,6 +205,12 @@ async def generate_video(
     fps: int = 16,
 ) -> dict:
     """Generate a video using Wan2.1-T2V-1.3B on local GPU."""
+    # Enhance prompt for better quality
+    enhanced_prompt = (
+        prompt.rstrip(". ")
+        + ", cinematic quality, smooth motion, high detail, professional videography, 4K"
+    )
+
     logger.info(
         "video_generation_started",
         prompt=prompt[:80],
@@ -219,10 +225,10 @@ async def generate_video(
         def _generate():
             pipe = _load_video_model()
             output = pipe(
-                prompt=prompt,
-                negative_prompt="blurry, low quality, distorted, watermark, static, ugly, deformed, amateur",
+                prompt=enhanced_prompt,
+                negative_prompt="blurry, low quality, distorted, watermark, static, ugly, deformed, amateur, jittery, flickering, noise, grain",
                 guidance_scale=5.0,
-                num_inference_steps=25,
+                num_inference_steps=30,
                 num_frames=num_frames,
                 height=height,
                 width=width,

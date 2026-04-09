@@ -56,16 +56,11 @@ interface PaginationMeta {
 
 type GenType = "image" | "video";
 
+// Wan2.1 generates at 16fps, max 81 frames. More frames = better quality + longer video.
 const VIDEO_DURATIONS = [
-  { label: "5s", value: 5 },
-  { label: "10s", value: 10 },
-  { label: "15s", value: 15 },
-  { label: "20s", value: 20 },
-  { label: "25s", value: 25 },
-  { label: "30s", value: 30 },
-  { label: "1m", value: 60 },
-  { label: "2m", value: 120 },
-  { label: "5m", value: 300 },
+  { label: "2s Quick", value: 2, frames: 33, est: "~1.5 min" },
+  { label: "3s Standard", value: 3, frames: 49, est: "~3 min" },
+  { label: "5s Best", value: 5, frames: 81, est: "~7 min" },
 ];
 
 /* --- Progress Button Component --- */
@@ -136,7 +131,7 @@ export default function MediaPage() {
   const [genPrompt, setGenPrompt] = useState("");
   const [genStyle, setGenStyle] = useState("");
   const [genAspectRatio, setGenAspectRatio] = useState("1:1");
-  const [genDuration, setGenDuration] = useState(5);
+  const [genDuration, setGenDuration] = useState(2);
   const [genElapsed, setGenElapsed] = useState(0);
   const genTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -233,16 +228,17 @@ export default function MediaPage() {
         if (genAspectRatio) body.aspect_ratio = genAspectRatio;
         res = await api.post("/media/generate-image", body);
       } else {
+        // Video generation can take up to 10 minutes for max quality
         res = await api.post("/media/generate-video", {
           prompt: genPrompt,
           duration: genDuration,
-        });
+        }, { timeout: 600000 });
       }
       setShowGenerate(false);
       setGenPrompt("");
       setGenStyle("");
       setGenAspectRatio("1:1");
-      setGenDuration(5);
+      setGenDuration(2);
       fetchMedia();
       // Auto-preview the generated item
       const generated = res.data.data;
@@ -310,8 +306,9 @@ export default function MediaPage() {
     return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
   }
 
-  // Estimated generation time — always 33 frames (~95s), image ~4s
-  const estimatedGenTime = genType === "image" ? 4 : 100;
+  // Estimated time based on frame count: ~95s for 33 frames, scales linearly
+  const selectedDuration = VIDEO_DURATIONS.find((d) => d.value === genDuration);
+  const estimatedGenTime = genType === "image" ? 4 : Math.round(((selectedDuration?.frames ?? 33) / 33) * 100);
 
   function Skeleton() {
     return (
@@ -844,27 +841,34 @@ export default function MediaPage() {
                 {genType === "video" && !generating && (
                   <div>
                     <label className="block text-sm font-medium mb-1.5">
-                      Duration
+                      Quality & Duration
                     </label>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="space-y-2">
                       {VIDEO_DURATIONS.map((d) => (
                         <button
                           key={d.value}
                           type="button"
                           onClick={() => setGenDuration(d.value)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left ${
                             genDuration === d.value
-                              ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "border-card-border text-muted hover:border-stone-300"
+                              ? "border-amber-500 bg-amber-50 dark:bg-amber-900/30"
+                              : "border-card-border hover:border-stone-300"
                           }`}
                         >
-                          {d.label}
+                          <div>
+                            <span className={`text-sm font-medium ${genDuration === d.value ? "text-amber-700 dark:text-amber-400" : ""}`}>
+                              {d.label}
+                            </span>
+                            <span className="text-xs text-muted ml-2">
+                              {d.frames} frames at 16fps
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted">{d.est}</span>
                         </button>
                       ))}
                     </div>
                     <p className="text-xs text-muted mt-2">
-                      All durations generate in ~1.5 min.{" "}
-                      {genDuration > 10 ? "Longer clips use fewer frames per second." : ""}
+                      Higher quality uses more frames. All videos render at 16fps for smooth motion.
                     </p>
                   </div>
                 )}
@@ -913,7 +917,7 @@ export default function MediaPage() {
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Generate {genType === "image" ? "Image" : `${genDuration >= 60 ? `${genDuration / 60}m` : `${genDuration}s`} Video`}
+                      Generate {genType === "image" ? "Image" : `${genDuration}s Video`}
                     </>
                   )}
                 </ProgressButton>
