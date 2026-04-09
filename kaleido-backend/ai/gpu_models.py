@@ -1,5 +1,5 @@
 """
-GPU Model Manager — manages SDXL-Lightning and AnimateDiff-Lightning models.
+GPU Model Manager — manages SDXL-Lightning and Wan2.1 models.
 Handles loading/unloading to share V100 32GB with Ollama.
 """
 
@@ -79,7 +79,7 @@ def _load_image_model():
 
 
 def _load_video_model():
-    """Load AnimateDiff-Lightning for video generation."""
+    """Load Wan2.1-T2V-1.3B for video generation."""
     global _video_pipe, _current_model
 
     if _current_model == "video":
@@ -87,52 +87,20 @@ def _load_video_model():
 
     _free_gpu()
 
-    from diffusers import AnimateDiffPipeline, MotionAdapter, EulerDiscreteScheduler
-    from huggingface_hub import hf_hub_download
-    from safetensors.torch import load_file
+    from diffusers import WanPipeline
 
-    logger.info("loading_video_model", model="AnimateDiff-Lightning")
+    logger.info("loading_video_model", model="Wan2.1-T2V-1.3B")
 
-    adapter = MotionAdapter.from_pretrained(
-        "guoyww/animatediff-motion-adapter-v1-5-2",
+    pipe = WanPipeline.from_pretrained(
+        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
         torch_dtype=torch.float16,
     )
-
-    pipe = AnimateDiffPipeline.from_pretrained(
-        "emilianJR/epiCRealism",
-        motion_adapter=adapter,
-        torch_dtype=torch.float16,
-    )
-
-    pipe.scheduler = EulerDiscreteScheduler.from_config(
-        pipe.scheduler.config,
-        timestep_spacing="trailing",
-        beta_schedule="linear",
-    )
-
-    ckpt = hf_hub_download(
-        "ByteDance/AnimateDiff-Lightning",
-        "animatediff_lightning_4step_diffusers.safetensors",
-    )
-    # Load Lightning weights, ignoring PE size mismatch
-    state_dict = load_file(ckpt)
-    missing, unexpected = pipe.unet.load_state_dict(state_dict, strict=False)
-
-    # Expand positional embeddings from 32 to 128 to support more frames
-    for name, module in pipe.unet.named_modules():
-        if hasattr(module, "pos_embed") and hasattr(module.pos_embed, "pe"):
-            pe = module.pos_embed.pe
-            if pe.shape[1] < 128:
-                new_pe = torch.zeros(1, 128, pe.shape[2], dtype=pe.dtype, device=pe.device)
-                new_pe[:, :pe.shape[1], :] = pe
-                module.pos_embed.pe = torch.nn.Parameter(new_pe, requires_grad=False)
-
     pipe.to("cuda")
     pipe.set_progress_bar_config(disable=True)
 
     _video_pipe = pipe
     _current_model = "video"
-    logger.info("video_model_loaded")
+    logger.info("video_model_loaded", vram_gb=f"{torch.cuda.memory_allocated()/1e9:.1f}")
     return pipe
 
 
@@ -231,12 +199,12 @@ async def generate_image(
 
 async def generate_video(
     prompt: str,
-    width: int = 512,
-    height: int = 512,
-    num_frames: int = 16,
-    fps: int = 8,
+    width: int = 832,
+    height: int = 480,
+    num_frames: int = 33,
+    fps: int = 16,
 ) -> dict:
-    """Generate a video using AnimateDiff-Lightning on local GPU."""
+    """Generate a video using Wan2.1-T2V-1.3B on local GPU."""
     logger.info(
         "video_generation_started",
         prompt=prompt[:80],
@@ -251,10 +219,10 @@ async def generate_video(
         def _generate():
             pipe = _load_video_model()
             output = pipe(
-                prompt=prompt + ", cinematic, high quality, smooth motion, professional",
-                negative_prompt="blurry, low quality, distorted, watermark, static, still image, ugly",
-                guidance_scale=1.0,
-                num_inference_steps=4,
+                prompt=prompt,
+                negative_prompt="blurry, low quality, distorted, watermark, static, ugly, deformed, amateur",
+                guidance_scale=5.0,
+                num_inference_steps=25,
                 num_frames=num_frames,
                 height=height,
                 width=width,
@@ -299,7 +267,7 @@ async def generate_video(
         "duration_seconds": duration,
         "ai_generated": True,
         "ai_prompt": prompt,
-        "ai_model": "animatediff-lightning",
+        "ai_model": "wan2.1-t2v-1.3b",
     }
 
 
