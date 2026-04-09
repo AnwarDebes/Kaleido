@@ -74,6 +74,8 @@ export default function MediaPage() {
   const [genPrompt, setGenPrompt] = useState("");
   const [genStyle, setGenStyle] = useState("");
   const [genAspectRatio, setGenAspectRatio] = useState("1:1");
+  const [genElapsed, setGenElapsed] = useState(0);
+  const genTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Preview modal
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
@@ -145,6 +147,8 @@ export default function MediaPage() {
     if (!genPrompt.trim()) return;
     setGenerating(true);
     setError("");
+    setGenElapsed(0);
+    genTimerRef.current = setInterval(() => setGenElapsed((t) => t + 1), 1000);
     try {
       if (genType === "image") {
         const body: Record<string, string> = { prompt: genPrompt };
@@ -167,6 +171,8 @@ export default function MediaPage() {
       );
     } finally {
       setGenerating(false);
+      if (genTimerRef.current) clearInterval(genTimerRef.current);
+      genTimerRef.current = null;
     }
   }
 
@@ -193,8 +199,8 @@ export default function MediaPage() {
   }
 
   function mediaUrl(item: MediaItem): string {
-    if (item.file_url) return `${API_URL}/v1${item.file_url}`;
-    return `${API_URL}/v1/media/files/${item.filename}`;
+    if (item.file_url) return `${API_URL}${item.file_url}`;
+    return `${API_URL}/media/files/${item.filename}`;
   }
 
   function isVideo(item: MediaItem): boolean {
@@ -707,11 +713,27 @@ export default function MediaPage() {
                   </div>
                 )}
 
-                {genType === "video" && (
+                {genType === "video" && !generating && (
                   <div className="rounded-lg bg-amber-500/5 border border-amber-500/10 px-4 py-3 text-xs text-muted">
-                    Video generation creates AI keyframe images and stitches them
-                    into a smooth video with Ken Burns effect. This may take 30-60
-                    seconds.
+                    Video generation uses Wan2.1 AI model on GPU. This typically
+                    takes 1-2 minutes to produce a high-quality clip.
+                  </div>
+                )}
+
+                {generating && (
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-4 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-amber-500 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-foreground">
+                      {genType === "image" ? "Generating image..." : "Generating video..."}
+                    </p>
+                    <p className="text-2xl font-bold text-amber-600 mt-1 tabular-nums">
+                      {Math.floor(genElapsed / 60)}:{(genElapsed % 60).toString().padStart(2, "0")}
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      {genType === "video"
+                        ? "Video generation typically takes 1-2 minutes"
+                        : "Image generation typically takes a few seconds"}
+                    </p>
                   </div>
                 )}
 
@@ -723,9 +745,7 @@ export default function MediaPage() {
                   {generating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {genType === "image"
-                        ? "Generating Image..."
-                        : "Generating Video..."}
+                      Generating...
                     </>
                   ) : (
                     <>
