@@ -56,7 +56,17 @@ interface PaginationMeta {
 
 type GenType = "image" | "video";
 
-const VIDEO_DURATIONS = [5, 10, 15, 20, 25, 30];
+const VIDEO_DURATIONS = [
+  { label: "5s", value: 5 },
+  { label: "10s", value: 10 },
+  { label: "15s", value: 15 },
+  { label: "20s", value: 20 },
+  { label: "25s", value: 25 },
+  { label: "30s", value: 30 },
+  { label: "1m", value: 60 },
+  { label: "2m", value: 120 },
+  { label: "5m", value: 300 },
+];
 
 /* --- Progress Button Component --- */
 function ProgressButton({
@@ -294,8 +304,17 @@ export default function MediaPage() {
     return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
   }
 
-  // Estimated time for progress bar
-  const estimatedGenTime = genType === "image" ? 5 : genDuration * 20;
+  // Estimated generation time (seconds) — based on real benchmarks
+  // ~95s for 33 frames, scales roughly linearly with frame count, capped at 81 frames
+  function estimateGenTime(): number {
+    if (genType === "image") return 4;
+    const fps = 16;
+    const maxFrames = 81;
+    const idealFrames = genDuration * fps + 1;
+    const frames = Math.min(idealFrames, maxFrames);
+    return Math.round((frames / 33) * 100);
+  }
+  const estimatedGenTime = estimateGenTime();
 
   function Skeleton() {
     return (
@@ -833,21 +852,24 @@ export default function MediaPage() {
                     <div className="flex gap-2 flex-wrap">
                       {VIDEO_DURATIONS.map((d) => (
                         <button
-                          key={d}
+                          key={d.value}
                           type="button"
-                          onClick={() => setGenDuration(d)}
+                          onClick={() => setGenDuration(d.value)}
                           className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                            genDuration === d
+                            genDuration === d.value
                               ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                               : "border-card-border text-muted hover:border-stone-300"
                           }`}
                         >
-                          {d}s
+                          {d.label}
                         </button>
                       ))}
                     </div>
                     <p className="text-xs text-muted mt-2">
-                      Longer videos take more time to generate. ~{genDuration * 20}s estimated.
+                      {genDuration > 5
+                        ? `Longer durations use fewer fps to fit ${genDuration}s. `
+                        : ""}
+                      Estimated: ~{Math.ceil(estimatedGenTime / 60)} min {estimatedGenTime % 60 > 0 ? `${estimatedGenTime % 60}s` : ""}
                     </p>
                   </div>
                 )}
@@ -896,7 +918,7 @@ export default function MediaPage() {
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Generate {genType === "image" ? "Image" : `${genDuration}s Video`}
+                      Generate {genType === "image" ? "Image" : `${genDuration >= 60 ? `${genDuration / 60}m` : `${genDuration}s`} Video`}
                     </>
                   )}
                 </ProgressButton>
