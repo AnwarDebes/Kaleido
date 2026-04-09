@@ -290,41 +290,41 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="glass-card p-6 mb-8">
         <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-2 flex-wrap">
           <Link
             href="/dashboard/posts?action=create"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs transition-colors"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3.5 w-3.5" />
             Create Post
           </Link>
           <Link
             href="/dashboard/posts?action=generate"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-medium text-sm transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-medium text-xs transition-colors"
           >
-            <Sparkles className="h-4 w-4" />
-            Generate Post with AI
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Post
           </Link>
           <Link
             href="/dashboard/media?generate=image"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium text-sm transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium text-xs transition-colors"
           >
-            <ImageIcon className="h-4 w-4" />
-            AI Image Generation
+            <ImageIcon className="h-3.5 w-3.5" />
+            AI Image
           </Link>
           <Link
             href="/dashboard/media?generate=video"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-medium text-sm transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-medium text-xs transition-colors"
           >
-            <Film className="h-4 w-4" />
-            AI Video Generation
+            <Film className="h-3.5 w-3.5" />
+            AI Video
           </Link>
           <Link
             href="/dashboard/schedule"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium text-sm transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium text-xs transition-colors"
           >
-            <Calendar className="h-4 w-4" />
-            Schedule Post
+            <Calendar className="h-3.5 w-3.5" />
+            Schedule
           </Link>
         </div>
       </div>

@@ -226,13 +226,14 @@ export default function MediaPage() {
     setGenElapsed(0);
     genTimerRef.current = setInterval(() => setGenElapsed((t) => t + 1), 1000);
     try {
+      let res;
       if (genType === "image") {
         const body: Record<string, string> = { prompt: genPrompt };
         if (genStyle) body.style = genStyle;
         if (genAspectRatio) body.aspect_ratio = genAspectRatio;
-        await api.post("/media/generate-image", body);
+        res = await api.post("/media/generate-image", body);
       } else {
-        await api.post("/media/generate-video", {
+        res = await api.post("/media/generate-video", {
           prompt: genPrompt,
           duration: genDuration,
         });
@@ -243,6 +244,11 @@ export default function MediaPage() {
       setGenAspectRatio("1:1");
       setGenDuration(5);
       fetchMedia();
+      // Auto-preview the generated item
+      const generated = res.data.data;
+      if (generated) {
+        setPreviewItem(generated);
+      }
     } catch {
       setError(
         genType === "image"
@@ -304,17 +310,8 @@ export default function MediaPage() {
     return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
   }
 
-  // Estimated generation time (seconds) — based on real benchmarks
-  // ~95s for 33 frames, scales roughly linearly with frame count, capped at 81 frames
-  function estimateGenTime(): number {
-    if (genType === "image") return 4;
-    const fps = 16;
-    const maxFrames = 81;
-    const idealFrames = genDuration * fps + 1;
-    const frames = Math.min(idealFrames, maxFrames);
-    return Math.round((frames / 33) * 100);
-  }
-  const estimatedGenTime = estimateGenTime();
+  // Estimated generation time — always 33 frames (~95s), image ~4s
+  const estimatedGenTime = genType === "image" ? 4 : 100;
 
   function Skeleton() {
     return (
@@ -866,10 +863,8 @@ export default function MediaPage() {
                       ))}
                     </div>
                     <p className="text-xs text-muted mt-2">
-                      {genDuration > 5
-                        ? `Longer durations use fewer fps to fit ${genDuration}s. `
-                        : ""}
-                      Estimated: ~{Math.ceil(estimatedGenTime / 60)} min {estimatedGenTime % 60 > 0 ? `${estimatedGenTime % 60}s` : ""}
+                      All durations generate in ~1.5 min.{" "}
+                      {genDuration > 10 ? "Longer clips use fewer frames per second." : ""}
                     </p>
                   </div>
                 )}

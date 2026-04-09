@@ -105,15 +105,9 @@ async def generate_video(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Calculate frames; cap at 81 (model limit), adjust fps for longer durations
-    max_frames = 81
-    ideal_frames = data.duration * data.fps + 1
-    if ideal_frames <= max_frames:
-        frames = ideal_frames
-        fps = data.fps
-    else:
-        frames = max_frames
-        fps = max(4, (max_frames - 1) // data.duration)
+    # Use 33 frames (fast, ~95s on V100) and adjust fps to match requested duration
+    frames = 33
+    fps = max(2, round((frames - 1) / data.duration))
     file_info = await VideoGenerator.generate_video(
         prompt=data.prompt,
         width=data.width,
