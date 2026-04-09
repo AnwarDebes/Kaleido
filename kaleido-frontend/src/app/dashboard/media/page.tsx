@@ -56,11 +56,12 @@ interface PaginationMeta {
 
 type GenType = "image" | "video";
 
-// Wan2.1 generates at 16fps, max 81 frames. More frames = better quality + longer video.
+// All durations at native 16fps, full quality, no compromise.
 const VIDEO_DURATIONS = [
-  { label: "2s Quick", value: 2, frames: 33, est: "~1.5 min" },
-  { label: "3s Standard", value: 3, frames: 49, est: "~3 min" },
-  { label: "5s Best", value: 5, frames: 81, est: "~7 min" },
+  { label: "2 seconds", value: 2, frames: 33, est: "~2 min" },
+  { label: "3 seconds", value: 3, frames: 49, est: "~3 min" },
+  { label: "5 seconds", value: 5, frames: 81, est: "~7 min" },
+  { label: "10 seconds", value: 10, frames: 161, est: "~14 min" },
 ];
 
 /* --- Progress Button Component --- */
@@ -306,9 +307,10 @@ export default function MediaPage() {
     return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
   }
 
-  // Estimated time based on frame count: ~95s for 33 frames, scales linearly
+  // ~95s per 33 frames, scales linearly. All at 16fps full quality.
   const selectedDuration = VIDEO_DURATIONS.find((d) => d.value === genDuration);
-  const estimatedGenTime = genType === "image" ? 4 : Math.round(((selectedDuration?.frames ?? 33) / 33) * 100);
+  const frames = selectedDuration?.frames ?? genDuration * 16 + 1;
+  const estimatedGenTime = genType === "image" ? 4 : Math.round((frames / 33) * 95);
 
   function Skeleton() {
     return (
@@ -868,7 +870,7 @@ export default function MediaPage() {
                       ))}
                     </div>
                     <p className="text-xs text-muted mt-2">
-                      Higher quality uses more frames. All videos render at 16fps for smooth motion.
+                      All videos at full 16fps quality. No compromises.
                     </p>
                   </div>
                 )}

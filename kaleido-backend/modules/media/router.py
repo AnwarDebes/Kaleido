@@ -105,11 +105,9 @@ async def generate_video(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Wan2.1 native fps is 16; always use 16fps for best quality.
-    # More frames = longer video but slower generation.
-    # Cap at 81 frames (model max) = 5s at 16fps.
+    # Always 16fps, always max frames. No quality compromise.
     fps = 16
-    frames = min(data.duration * fps + 1, 81)
+    frames = data.duration * fps + 1
     file_info = await VideoGenerator.generate_video(
         prompt=data.prompt,
         width=data.width,
