@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
+import Toasts from "@/components/dashboard/Toasts";
+import VideoJobTracker from "@/components/dashboard/VideoJobTracker";
 
 export default function DashboardLayout({
   children,
@@ -54,6 +56,8 @@ export default function DashboardLayout({
         <Topbar />
         <main className="flex-1 overflow-y-auto px-3 py-4 sm:p-6 pt-14 lg:pt-4">{children}</main>
       </div>
+      <Toasts />
+      <VideoJobTracker />
     </div>
   );
 }

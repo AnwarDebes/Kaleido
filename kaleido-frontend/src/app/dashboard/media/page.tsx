@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useNotificationStore } from "@/lib/notifications";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -215,14 +216,31 @@ export default function MediaPage() {
     }
   }
 
+  const { addToast, addVideoJob } = useNotificationStore();
+
+  // Listen for completed video jobs to show preview + refresh list
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setPreviewItem(detail);
+        fetchMedia();
+      }
+    };
+    window.addEventListener("video-job-complete", handler);
+    return () => window.removeEventListener("video-job-complete", handler);
+  }, [fetchMedia]);
+
   async function handleGenerate() {
     if (!genPrompt.trim()) return;
-    setGenerating(true);
     setError("");
-    setGenElapsed(0);
-    genTimerRef.current = setInterval(() => setGenElapsed((t) => t + 1), 1000);
-    try {
-      if (genType === "image") {
+
+    if (genType === "image") {
+      // Image: keep in-modal progress (fast ~4s)
+      setGenerating(true);
+      setGenElapsed(0);
+      genTimerRef.current = setInterval(() => setGenElapsed((t) => t + 1), 1000);
+      try {
         const body: Record<string, string> = { prompt: genPrompt };
         if (genStyle) body.style = genStyle;
         if (genAspectRatio) body.aspect_ratio = genAspectRatio;
@@ -234,8 +252,17 @@ export default function MediaPage() {
         fetchMedia();
         const generated = res.data.data;
         if (generated) setPreviewItem(generated);
-      } else {
-        // Start video job — returns immediately with job_id
+        addToast({ type: "success", title: "Image generated!" });
+      } catch {
+        setError("Image generation failed. Please try again.");
+      } finally {
+        setGenerating(false);
+        if (genTimerRef.current) clearInterval(genTimerRef.current);
+        genTimerRef.current = null;
+      }
+    } else {
+      // Video: close modal immediately, track in background
+      try {
         const startRes = await api.post("/media/generate-video", {
           prompt: genPrompt,
           duration: genDuration,
@@ -243,44 +270,30 @@ export default function MediaPage() {
         const jobId = startRes.data.data?.job_id;
         if (!jobId) throw new Error("No job ID returned");
 
-        // Poll for completion
-        const pollResult = await new Promise<MediaItem>((resolve, reject) => {
-          const poll = async () => {
-            try {
-              const statusRes = await api.get(`/media/generate-video/status/${jobId}`);
-              const d = statusRes.data;
-              if (d.success && d.data?.status === "completed") {
-                resolve(d.data.data);
-              } else if (!d.success || d.data?.status === "failed") {
-                reject(new Error(d.error?.message || "Video generation failed"));
-              } else {
-                // Still generating — poll again in 3s
-                setTimeout(poll, 3000);
-              }
-            } catch (err) {
-              reject(err);
-            }
-          };
-          setTimeout(poll, 3000);
-        });
+        const dur = genDuration;
+        const prompt = genPrompt;
+        const est = startRes.data.data?.estimated_seconds || Math.round(((dur * 16 + 1) / 33) * 95);
 
+        // Close modal and reset
         setShowGenerate(false);
         setGenPrompt("");
         setGenDuration(2);
-        fetchMedia();
-        if (pollResult) setPreviewItem(pollResult);
+
+        // Hand off to background tracker
+        addVideoJob({
+          jobId,
+          prompt,
+          duration: dur,
+          estimatedSeconds: est,
+        });
+        addToast({
+          type: "info",
+          title: "Video generation started",
+          message: `${dur}s video — you can keep working while it generates`,
+        });
+      } catch {
+        setError("Failed to start video generation. Please try again.");
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Generation failed";
-      setError(
-        genType === "image"
-          ? "Image generation failed. Please try again."
-          : `Video generation failed: ${msg}`
-      );
-    } finally {
-      setGenerating(false);
-      if (genTimerRef.current) clearInterval(genTimerRef.current);
-      genTimerRef.current = null;
     }
   }
 
@@ -900,18 +913,17 @@ export default function MediaPage() {
                   </div>
                 )}
 
-                {generating && (
+                {generating && genType === "image" && (
                   <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-4">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
-                        {genType === "image" ? "Generating image..." : "Generating video..."}
+                        Generating image...
                       </p>
                       <p className="text-sm font-bold text-amber-600 tabular-nums">
                         {Math.floor(genElapsed / 60)}:{(genElapsed % 60).toString().padStart(2, "0")}
                       </p>
                     </div>
-                    {/* Progress bar */}
                     <div className="w-full h-2 bg-amber-200/30 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full"
@@ -931,12 +943,12 @@ export default function MediaPage() {
                 <ProgressButton
                   onClick={handleGenerate}
                   disabled={generating || !genPrompt.trim()}
-                  loading={generating}
+                  loading={generating && genType === "image"}
                   elapsed={genElapsed}
                   estimatedSeconds={estimatedGenTime}
                   className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50"
                 >
-                  {generating ? (
+                  {generating && genType === "image" ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       {Math.min(Math.round((genElapsed / estimatedGenTime) * 100), 95)}%
