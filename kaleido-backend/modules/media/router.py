@@ -105,11 +105,12 @@ async def generate_video(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    frames = data.duration * data.fps + 1
     file_info = await VideoGenerator.generate_video(
         prompt=data.prompt,
         width=data.width,
         height=data.height,
-        frames=data.frames,
+        frames=frames,
         fps=data.fps,
     )
     media = await MediaService.save_generated_media(

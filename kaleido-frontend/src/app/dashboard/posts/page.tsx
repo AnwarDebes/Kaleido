@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -125,6 +126,7 @@ function PostSkeleton() {
 /* ---------- main page ---------- */
 
 export default function PostsPage() {
+  const searchParams = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
@@ -176,6 +178,13 @@ export default function PostsPage() {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  // Auto-open modals from URL params
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "generate") setShowAIGenerate(true);
+    else if (action === "create") openNewPost();
+  }, [searchParams]);
 
   /* handlers */
   function openNewPost() {

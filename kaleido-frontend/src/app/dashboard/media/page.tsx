@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Image as ImageIcon,
@@ -17,6 +18,7 @@ import {
   Search,
   ChevronRight,
   Filter,
+  Clock,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -31,6 +33,7 @@ interface MediaItem {
   file_size?: number;
   width?: number;
   height?: number;
+  duration_seconds?: number;
   ai_generated?: boolean;
   ai_prompt?: string;
   folder: string;
@@ -53,7 +56,54 @@ interface PaginationMeta {
 
 type GenType = "image" | "video";
 
+const VIDEO_DURATIONS = [5, 10, 15, 20, 25, 30];
+
+/* --- Progress Button Component --- */
+function ProgressButton({
+  onClick,
+  disabled,
+  loading,
+  elapsed,
+  estimatedSeconds,
+  children,
+  className,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  loading: boolean;
+  elapsed: number;
+  estimatedSeconds: number;
+  children: React.ReactNode;
+  className: string;
+}) {
+  const progress = loading
+    ? Math.min((elapsed / estimatedSeconds) * 100, 95)
+    : 0;
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${className} relative overflow-hidden`}
+    >
+      {loading && (
+        <motion.div
+          className="absolute inset-0 bg-white/20"
+          initial={{ width: "0%" }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.5, ease: "linear" }}
+          style={{ originX: 0 }}
+        />
+      )}
+      <span className="relative z-10 flex items-center justify-center gap-2">
+        {children}
+      </span>
+    </button>
+  );
+}
+
 export default function MediaPage() {
+  const searchParams = useSearchParams();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +115,8 @@ export default function MediaPage() {
 
   // Upload state
   const [uploading, setUploading] = useState(false);
+  const [uploadElapsed, setUploadElapsed] = useState(0);
+  const uploadTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // AI Generate modal
@@ -74,6 +126,7 @@ export default function MediaPage() {
   const [genPrompt, setGenPrompt] = useState("");
   const [genStyle, setGenStyle] = useState("");
   const [genAspectRatio, setGenAspectRatio] = useState("1:1");
+  const [genDuration, setGenDuration] = useState(5);
   const [genElapsed, setGenElapsed] = useState(0);
   const genTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -121,10 +174,21 @@ export default function MediaPage() {
     fetchFolders();
   }, [fetchFolders]);
 
+  // Auto-open generate modal from URL params
+  useEffect(() => {
+    const gen = searchParams.get("generate");
+    if (gen === "image" || gen === "video") {
+      setGenType(gen);
+      setShowGenerate(true);
+    }
+  }, [searchParams]);
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadElapsed(0);
+    uploadTimerRef.current = setInterval(() => setUploadElapsed((t) => t + 1), 1000);
     setError("");
     try {
       const formData = new FormData();
@@ -139,6 +203,8 @@ export default function MediaPage() {
       setError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
+      if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+      uploadTimerRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -156,12 +222,16 @@ export default function MediaPage() {
         if (genAspectRatio) body.aspect_ratio = genAspectRatio;
         await api.post("/media/generate-image", body);
       } else {
-        await api.post("/media/generate-video", { prompt: genPrompt });
+        await api.post("/media/generate-video", {
+          prompt: genPrompt,
+          duration: genDuration,
+        });
       }
       setShowGenerate(false);
       setGenPrompt("");
       setGenStyle("");
       setGenAspectRatio("1:1");
+      setGenDuration(5);
       fetchMedia();
     } catch {
       setError(
@@ -205,7 +275,7 @@ export default function MediaPage() {
 
   function isVideo(item: MediaItem): boolean {
     return (
-      item.file_type?.startsWith("video") ||
+      item.file_type === "video" ||
       /\.(mp4|webm|mov|avi)$/i.test(item.filename)
     );
   }
@@ -216,6 +286,16 @@ export default function MediaPage() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
+
+  function formatDuration(seconds?: number): string {
+    if (!seconds) return "";
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
+  }
+
+  // Estimated time for progress bar
+  const estimatedGenTime = genType === "image" ? 5 : genDuration * 20;
 
   function Skeleton() {
     return (
@@ -372,9 +452,12 @@ export default function MediaPage() {
             <span className="hidden sm:inline">AI Generate</span>
             <span className="sm:hidden">Generate</span>
           </button>
-          <button
+          <ProgressButton
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
+            loading={uploading}
+            elapsed={uploadElapsed}
+            estimatedSeconds={10}
             className="inline-flex items-center gap-2 rounded-lg border border-card-border bg-card-bg px-3 sm:px-4 py-2.5 text-sm font-medium hover:border-amber-500/30 transition-colors disabled:opacity-50"
           >
             {uploading ? (
@@ -382,8 +465,8 @@ export default function MediaPage() {
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            Upload
-          </button>
+            {uploading ? `${uploadElapsed}s` : "Upload"}
+          </ProgressButton>
           <input
             ref={fileInputRef}
             type="file"
@@ -461,13 +544,24 @@ export default function MediaPage() {
                     className="glass-card group relative overflow-hidden rounded-xl cursor-pointer hover:border-amber-500/30 transition-colors"
                     onClick={() => setPreviewItem(item)}
                   >
-                    <div className="aspect-square relative bg-amber-500/5">
+                    <div className="aspect-square relative bg-black/5">
                       {isVideo(item) ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="h-12 w-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                            <Film className="h-6 w-6 text-white" />
-                          </div>
-                        </div>
+                        <video
+                          src={mediaUrl(item)}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="h-full w-full object-cover"
+                          onMouseEnter={(e) => {
+                            const v = e.currentTarget;
+                            v.currentTime = 0;
+                            v.play().catch(() => {});
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.pause();
+                            e.currentTarget.currentTime = 0;
+                          }}
+                        />
                       ) : (
                         <img
                           src={mediaUrl(item)}
@@ -493,6 +587,23 @@ export default function MediaPage() {
                             <Sparkles className="h-2.5 w-2.5" />
                             AI
                           </span>
+                        </div>
+                      )}
+                      {/* Duration badge for videos */}
+                      {isVideo(item) && item.duration_seconds && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-black/60 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            <Clock className="h-2.5 w-2.5" />
+                            {formatDuration(item.duration_seconds)}
+                          </span>
+                        </div>
+                      )}
+                      {/* Play icon overlay for videos */}
+                      {isVideo(item) && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                            <Film className="h-5 w-5 text-white" />
+                          </div>
                         </div>
                       )}
                       {/* Delete button */}
@@ -713,47 +824,82 @@ export default function MediaPage() {
                   </div>
                 )}
 
+                {/* Video-specific options */}
                 {genType === "video" && !generating && (
-                  <div className="rounded-lg bg-amber-500/5 border border-amber-500/10 px-4 py-3 text-xs text-muted">
-                    Video generation uses Wan2.1 AI model on GPU. This typically
-                    takes 1-2 minutes to produce a high-quality clip.
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">
+                      Duration
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {VIDEO_DURATIONS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setGenDuration(d)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                            genDuration === d
+                              ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              : "border-card-border text-muted hover:border-stone-300"
+                          }`}
+                        >
+                          {d}s
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted mt-2">
+                      Longer videos take more time to generate. ~{genDuration * 20}s estimated.
+                    </p>
                   </div>
                 )}
 
                 {generating && (
-                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-4 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-amber-500 mx-auto mb-2" />
-                    <p className="text-sm font-medium text-foreground">
-                      {genType === "image" ? "Generating image..." : "Generating video..."}
-                    </p>
-                    <p className="text-2xl font-bold text-amber-600 mt-1 tabular-nums">
-                      {Math.floor(genElapsed / 60)}:{(genElapsed % 60).toString().padStart(2, "0")}
-                    </p>
-                    <p className="text-xs text-muted mt-1">
-                      {genType === "video"
-                        ? "Video generation typically takes 1-2 minutes"
-                        : "Image generation typically takes a few seconds"}
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                        {genType === "image" ? "Generating image..." : "Generating video..."}
+                      </p>
+                      <p className="text-sm font-bold text-amber-600 tabular-nums">
+                        {Math.floor(genElapsed / 60)}:{(genElapsed % 60).toString().padStart(2, "0")}
+                      </p>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full h-2 bg-amber-200/30 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full"
+                        initial={{ width: "0%" }}
+                        animate={{
+                          width: `${Math.min((genElapsed / estimatedGenTime) * 100, 95)}%`,
+                        }}
+                        transition={{ duration: 0.5, ease: "linear" }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted mt-2 text-center">
+                      {Math.min(Math.round((genElapsed / estimatedGenTime) * 100), 95)}% — est. {Math.ceil(estimatedGenTime / 60)} min
                     </p>
                   </div>
                 )}
 
-                <button
+                <ProgressButton
                   onClick={handleGenerate}
                   disabled={generating || !genPrompt.trim()}
-                  className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                  loading={generating}
+                  elapsed={genElapsed}
+                  estimatedSeconds={estimatedGenTime}
+                  className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50"
                 >
                   {generating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
+                      {Math.min(Math.round((genElapsed / estimatedGenTime) * 100), 95)}%
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Generate {genType === "image" ? "Image" : "Video"}
+                      Generate {genType === "image" ? "Image" : `${genDuration}s Video`}
                     </>
                   )}
-                </button>
+                </ProgressButton>
               </div>
             </motion.div>
           </motion.div>
@@ -814,6 +960,9 @@ export default function MediaPage() {
                         <span>
                           {previewItem.width}x{previewItem.height}
                         </span>
+                      )}
+                      {previewItem.duration_seconds && (
+                        <span>{formatDuration(previewItem.duration_seconds)}</span>
                       )}
                       {previewItem.folder && (
                         <>

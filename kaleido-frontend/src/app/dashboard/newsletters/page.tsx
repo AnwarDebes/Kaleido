@@ -41,7 +41,8 @@ interface Subscriber {
   id: string;
   email: string;
   name?: string;
-  created_at: string;
+  status?: string;
+  subscribed_at: string;
 }
 
 interface Brand {
@@ -219,6 +220,7 @@ export default function NewslettersPage() {
     e.preventDefault();
     setAddingSub(true);
     setError("");
+    setSuccess("");
 
     try {
       const payload: Record<string, unknown> = { email: subEmail };
@@ -227,10 +229,11 @@ export default function NewslettersPage() {
       setSubEmail("");
       setSubName("");
       setShowAddSub(false);
-      fetchSubscribers();
+      await fetchSubscribers();
       setSuccess("Subscriber added successfully.");
-    } catch {
-      setError("Failed to add subscriber.");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(typeof msg === "string" ? msg : "Failed to add subscriber.");
     } finally {
       setAddingSub(false);
     }
@@ -525,7 +528,7 @@ export default function NewslettersPage() {
                       <td className="px-5 py-3">{sub.email}</td>
                       <td className="px-5 py-3 text-muted">{sub.name || "-"}</td>
                       <td className="px-5 py-3 text-muted">
-                        {format(new Date(sub.created_at), "MMM d, yyyy")}
+                        {format(new Date(sub.subscribed_at), "MMM d, yyyy")}
                       </td>
                       <td className="px-5 py-3">
                         <button

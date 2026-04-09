@@ -46,9 +46,9 @@ class GenerateImageRequest(BaseModel):
 
 class GenerateVideoRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=2000)
+    duration: int = Field(default=5, ge=2, le=30)
     width: int = Field(default=832, ge=256, le=1280)
     height: int = Field(default=480, ge=256, le=720)
-    frames: int = Field(default=33, ge=17, le=81)
     fps: int = Field(default=16, ge=8, le=30)
     folder: str = "/generated"
     tags: list[str] = Field(default_factory=list)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   Zap,
   CalendarOff,
   RotateCcw,
+  Plus,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import clsx from "clsx";
@@ -31,6 +33,14 @@ import {
 } from "date-fns";
 
 /* ---------- types ---------- */
+
+interface DraftPost {
+  id: string;
+  content_text: string | null;
+  platform_contents: Record<string, unknown>;
+  status: string;
+  created_at: string;
+}
 
 interface ScheduledPost {
   id: string;
@@ -111,6 +121,7 @@ function CalendarSkeleton() {
 /* ---------- main page ---------- */
 
 export default function SchedulePage() {
+  const searchParams = useSearchParams();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +135,14 @@ export default function SchedulePage() {
 
   // action loading
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // schedule modal
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [draftPosts, setDraftPosts] = useState<DraftPost[]>([]);
+  const [schedulePostId, setSchedulePostId] = useState("");
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduling, setScheduling] = useState(false);
 
   /* fetch calendar data */
   const fetchCalendar = useCallback(async () => {
@@ -146,6 +165,52 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchCalendar();
   }, [fetchCalendar]);
+
+  // Auto-open schedule modal if post param is present
+  useEffect(() => {
+    const postId = searchParams.get("post");
+    if (postId) {
+      setSchedulePostId(postId);
+      setShowScheduleModal(true);
+      fetchDraftPosts();
+    }
+  }, [searchParams]);
+
+  async function fetchDraftPosts() {
+    try {
+      const res = await api.get("/posts?status=draft&per_page=50");
+      setDraftPosts(res.data.data || []);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function openScheduleModal() {
+    setShowScheduleModal(true);
+    setScheduleDate(format(selectedDate || new Date(), "yyyy-MM-dd"));
+    setScheduleTime("09:00");
+    setSchedulePostId("");
+    await fetchDraftPosts();
+  }
+
+  async function handleSchedulePost() {
+    if (!schedulePostId || !scheduleDate || !scheduleTime) return;
+    setScheduling(true);
+    setError("");
+    try {
+      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString();
+      await api.post(`/schedule/posts/${schedulePostId}`, {
+        scheduled_at: scheduledAt,
+      });
+      setShowScheduleModal(false);
+      setSchedulePostId("");
+      fetchCalendar();
+    } catch {
+      setError("Failed to schedule post. Please try again.");
+    } finally {
+      setScheduling(false);
+    }
+  }
 
   /* handlers */
   function goToday() {
@@ -217,6 +282,13 @@ export default function SchedulePage() {
 
         {/* month navigation */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={openScheduleModal}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+          >
+            <Plus className="h-4 w-4" />
+            Schedule Post
+          </button>
           <button
             onClick={goToday}
             className="px-3 py-1.5 rounded-lg text-sm font-medium border border-card-border hover:bg-stone-50 transition-colors"
@@ -505,6 +577,115 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Schedule Post Modal */}
+      <AnimatePresence>
+        {showScheduleModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => !scheduling && setShowScheduleModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="glass-card p-5 sm:p-6 w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5 text-amber-500" />
+                  Schedule Post
+                </h2>
+                <button
+                  onClick={() => !scheduling && setShowScheduleModal(false)}
+                  className="p-1 rounded-md hover:bg-stone-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Select post */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Select a draft post
+                  </label>
+                  <select
+                    value={schedulePostId}
+                    onChange={(e) => setSchedulePostId(e.target.value)}
+                    className="w-full rounded-lg border border-card-border bg-background px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                  >
+                    <option value="">Choose a post...</option>
+                    {draftPosts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {(p.content_text || "Untitled").slice(0, 60)}
+                        {(p.content_text || "").length > 60 ? "..." : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {draftPosts.length === 0 && (
+                    <p className="text-xs text-muted mt-1">
+                      No draft posts available. Create a post first.
+                    </p>
+                  )}
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    min={format(new Date(), "yyyy-MM-dd")}
+                    className="w-full rounded-lg border border-card-border bg-background px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                  />
+                </div>
+
+                {/* Time */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-full rounded-lg border border-card-border bg-background px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSchedulePost}
+                    disabled={scheduling || !schedulePostId || !scheduleDate}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50"
+                  >
+                    {scheduling ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CalendarIcon className="h-4 w-4" />
+                    )}
+                    {scheduling ? "Scheduling..." : "Schedule"}
+                  </button>
+                  <button
+                    onClick={() => setShowScheduleModal(false)}
+                    className="rounded-lg border border-card-border px-4 py-2.5 text-sm font-medium hover:bg-stone-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
