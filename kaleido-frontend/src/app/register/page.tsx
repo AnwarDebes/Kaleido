@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
+import KaleidoLogo from "@/components/KaleidoLogo";
 
 function RegisterForm() {
   const router = useRouter();
@@ -85,12 +86,7 @@ function RegisterForm() {
         </Link>
 
         <div className="glass-card p-8">
-          <div className="flex items-center gap-2 mb-8">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">K</span>
-            </div>
-            <span className="text-xl font-bold gradient-text">Kaleido</span>
-          </div>
+          <KaleidoLogo className="mb-8" />
 
           <h1 className="text-2xl font-bold mb-1">Create your account</h1>
           <p className="text-sm text-muted mb-6">

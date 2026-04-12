@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import KaleidoLogo, { KaleidoIcon } from "@/components/KaleidoLogo";
 
 interface NavItem {
   label: string;
@@ -120,18 +121,10 @@ export default function Sidebar() {
           collapsed && "justify-center px-2",
         )}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 font-bold text-white text-lg shadow-lg shadow-amber-500/25">
-          K
-        </div>
-        {!collapsed && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="gradient-text text-xl font-bold"
-          >
-            Kaleido
-          </motion.span>
+        {collapsed ? (
+          <KaleidoIcon className="h-9 w-9 shrink-0" />
+        ) : (
+          <KaleidoLogo size="lg" />
         )}
       </div>
 

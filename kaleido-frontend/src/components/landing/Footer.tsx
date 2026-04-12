@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 import { getTranslations, isRTL } from "@/lib/i18n";
+import KaleidoLogo from "@/components/KaleidoLogo";
 
 export default function Footer() {
   const { locale } = useAppStore();
@@ -46,12 +47,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           {/* Brand */}
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">K</span>
-              </div>
-              <span className="text-xl font-bold gradient-text">Kaleido</span>
-            </div>
+            <KaleidoLogo className="mb-4" />
             <p className="text-sm text-muted max-w-xs leading-relaxed">
               {t.footer.description}
             </p>

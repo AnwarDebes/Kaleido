@@ -6,6 +6,7 @@ import { Menu, X, Sun, Moon, Globe } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { getTranslations, isRTL, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
+import KaleidoLogo from "@/components/KaleidoLogo";
 
 const localeLabels: Record<Locale, string> = {
   en: "EN",
@@ -35,11 +36,8 @@ export default function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">K</span>
-            </div>
-            <span className="text-xl font-bold gradient-text">Kaleido</span>
+          <a href="#">
+            <KaleidoLogo />
           </a>
 
           {/* Desktop nav */}
