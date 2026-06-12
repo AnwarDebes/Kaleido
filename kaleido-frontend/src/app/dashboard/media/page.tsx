@@ -437,7 +437,9 @@ export default function MediaPage() {
   // ~95s per 33 frames, scales linearly. All at 16fps full quality.
   const selectedDuration = VIDEO_DURATIONS.find((d) => d.value === genDuration);
   const frames = selectedDuration?.frames ?? genDuration * 16 + 1;
-  const estimatedGenTime = genType === "image" ? 4 : Math.round((frames / 33) * 95);
+  // Measured on this server: warm image ~7s (cold reload up to 90s), video
+  // ~90s for 81 frames including model load.
+  const estimatedGenTime = genType === "image" ? 10 : Math.round(frames * 1.2);
 
   function Skeleton() {
     return (
@@ -910,7 +912,7 @@ export default function MediaPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
-            onClick={() => !generating && setShowGenerate(false)}
+            onClick={() => setShowGenerate(false)}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -932,7 +934,8 @@ export default function MediaPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => !generating && setShowGenerate(false)}
+                  onClick={() => setShowGenerate(false)}
+                  title="Close. Generation keeps running and the result lands in your library."
                   className="rounded-lg p-2 text-muted hover:text-foreground hover:bg-amber-500/5 transition-colors"
                 >
                   <X className="h-5 w-5" />

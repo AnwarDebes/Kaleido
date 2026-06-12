@@ -158,7 +158,7 @@ async def generate_video(
     job_id = str(uuid.uuid4())
     fps = 16
     frames = data.duration * fps + 1
-    est_seconds = round((frames / 33) * 95)
+    est_seconds = round(frames * 1.2)  # measured ~90s for 81 frames on this GPU
 
     _video_jobs[job_id] = {"status": "generating"}
 

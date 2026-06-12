@@ -858,7 +858,7 @@ function StudioInner() {
 
             {/* AI row */}
             <div className="mt-4 pt-4 border-t border-card-border space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   ref={aiInputRef}
                   type="text"
@@ -867,7 +867,7 @@ function StudioInner() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleWriteWithAI();
                   }}
-                  className="flex-1 rounded-lg border border-card-border bg-background px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+                  className="flex-1 min-w-[160px] rounded-lg border border-card-border bg-background px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
                   placeholder="Topic for the AI, e.g. our spring release"
                 />
                 <select
@@ -884,7 +884,7 @@ function StudioInner() {
                 <button
                   onClick={handleWriteWithAI}
                   disabled={!aiPrompt.trim() || aiBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50"
+                  className="shrink-0 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-50"
                 >
                   {aiWriting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

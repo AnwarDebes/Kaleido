@@ -289,12 +289,14 @@ async def generate_video(
         try:
             frames = await loop.run_in_executor(None, _generate)
         finally:
-            # Give the card back: drop the 5B video model and re-warm the
-            # text model so chat and post generation stay fast.
+            # Give the card back: drop the video model, re-warm the text
+            # model and reload the image model so the next image request
+            # stays fast (a cold reload can outlive proxy timeouts).
             _free_gpu()
             threading.Thread(
                 target=_ollama_set_keepalive, args=("1h",), daemon=True
             ).start()
+            threading.Thread(target=warm_image_model, daemon=True).start()
         elapsed = time.time() - start
 
         # fp16 on Volta can overflow and produce NaN or flat black frames.
@@ -351,6 +353,18 @@ async def generate_video(
         "ai_prompt": prompt,
         "ai_model": VIDEO_MODEL_NAME,
     }
+
+
+def warm_image_model() -> None:
+    """Load SDXL into VRAM so the first user request is seconds, not a
+    minute of cold disk reads. Safe to call from a background thread."""
+    try:
+        if torch is None or not torch.cuda.is_available():
+            return
+        _load_image_model()
+        logger.info("image_model_warmed")
+    except Exception as e:
+        logger.warning("image_model_warmup_failed", error=str(e))
 
 
 async def release_gpu():

@@ -89,6 +89,12 @@ async def lifespan(app: FastAPI):
 
     warmup_task = asyncio.create_task(_warm_ollama())
 
+    import threading
+
+    from ai.gpu_models import warm_image_model
+
+    threading.Thread(target=warm_image_model, daemon=True).start()
+
     yield
 
     warmup_task.cancel()
