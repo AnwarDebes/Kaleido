@@ -83,24 +83,68 @@ def _load_image_model():
     return pipe
 
 
+def _ollama_set_keepalive(keep_alive) -> None:
+    """Ask Ollama to load or unload the text model. The 5B video model plus
+    the text model do not fit in 32GB together, so video generation borrows
+    the whole card and gives it back afterwards."""
+    try:
+        import httpx
+
+        httpx.post(
+            f"{settings.ollama_base_url}/api/generate",
+            json={
+                "model": settings.ollama_model,
+                "prompt": "OK",
+                "stream": False,
+                "keep_alive": keep_alive,
+                "options": {"num_predict": 1},
+            },
+            timeout=600,
+        )
+    except Exception as e:
+        logger.warning("ollama_keepalive_failed", error=str(e))
+
+
+# FastWan2.2-TI2V-5B was tested on this V100 and produced empty frames in
+# fp16 (Volta has no bf16; the 5B weights overflow when cast). The 1.3B
+# distill shares the architecture of the original Wan2.1-1.3B, which ran
+# stably in fp16 here, and needs 3 steps instead of 30.
+# Model choice, measured on this V100 with the same prompt and settings:
+#   FastWan2.1-T2V-1.3B: 5s clip in ~90s total, stable fp16, solid quality
+#   FastWan2.2-TI2V-5B:  4s clip in ~249s total, works but too slow for users
+# Both are 3-step DMD distills; the 1.3B inherits its quality from the
+# Wan2.1-14B teacher and wins on speed by a wide margin here.
+VIDEO_MODEL_REPO = "FastVideo/FastWan2.1-T2V-1.3B-Diffusers"
+VIDEO_MODEL_NAME = "fastwan2.1-t2v-1.3b"
+
+
 def _load_video_model():
-    """Load Wan2.1-T2V-1.3B for video generation."""
+    """Load FastWan2.1-T2V-1.3B, a 3 step distilled video model.
+
+    Loading notes for the V100 (fp16 only, no bf16): the repo declares a
+    FastVideo-only pipeline class in model_index.json, so the generic
+    DiffusionPipeline loader fails. Load WanPipeline explicitly, cast the
+    bf16 weights to fp16, and keep the VAE in fp32 with tiling enabled."""
     global _video_pipe, _current_model
 
     if _current_model == "video":
         return _video_pipe
 
     _free_gpu()
+    _ollama_set_keepalive(0)  # evict the text model, we need the VRAM
 
-    from diffusers import WanPipeline
+    from diffusers import AutoencoderKLWan, WanPipeline
 
-    logger.info("loading_video_model", model="Wan2.1-T2V-1.3B")
+    logger.info("loading_video_model", model=VIDEO_MODEL_NAME)
 
+    vae = AutoencoderKLWan.from_pretrained(
+        VIDEO_MODEL_REPO, subfolder="vae", torch_dtype=torch.float32
+    )
     pipe = WanPipeline.from_pretrained(
-        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-        torch_dtype=torch.float16,
+        VIDEO_MODEL_REPO, vae=vae, torch_dtype=torch.float16
     )
     pipe.to("cuda")
+    pipe.vae.enable_tiling()
     pipe.set_progress_bar_config(disable=True)
 
     _video_pipe = pipe
@@ -209,18 +253,15 @@ async def generate_video(
     prompt: str,
     width: int = 832,
     height: int = 480,
-    num_frames: int = 33,
+    num_frames: int = 81,
     fps: int = 16,
 ) -> dict:
-    """Generate a video using Wan2.1-T2V-1.3B on local GPU."""
+    """Generate a video with FastWan2.1 (3 distilled steps, guidance off).
+
+    The prompt should already be detailed; the caller enriches short
+    prompts with the text model before calling this."""
     if torch is None or not torch.cuda.is_available():
         raise RuntimeError("Video generation is temporarily unavailable on this server")
-
-    # Enhance prompt for better quality
-    enhanced_prompt = (
-        prompt.rstrip(". ")
-        + ", cinematic quality, smooth motion, high detail, professional videography, 4K"
-    )
 
     logger.info(
         "video_generation_started",
@@ -236,18 +277,42 @@ async def generate_video(
         def _generate():
             pipe = _load_video_model()
             output = pipe(
-                prompt=enhanced_prompt,
-                negative_prompt="blurry, low quality, distorted, watermark, static, ugly, deformed, amateur, jittery, flickering, noise, grain",
-                guidance_scale=5.0,
-                num_inference_steps=30,
+                prompt=prompt,
+                num_inference_steps=3,
+                guidance_scale=1.0,
                 num_frames=num_frames,
                 height=height,
                 width=width,
             )
             return output.frames[0]
 
-        frames = await loop.run_in_executor(None, _generate)
+        try:
+            frames = await loop.run_in_executor(None, _generate)
+        finally:
+            # Give the card back: drop the 5B video model and re-warm the
+            # text model so chat and post generation stay fast.
+            _free_gpu()
+            threading.Thread(
+                target=_ollama_set_keepalive, args=("1h",), daemon=True
+            ).start()
         elapsed = time.time() - start
+
+        # fp16 on Volta can overflow and produce NaN or flat black frames.
+        # Frames may be floats in [0, 1] or uint8 in [0, 255]; normalize
+        # before judging flatness.
+        try:
+            import numpy as np
+
+            arr = np.asarray(frames[len(frames) // 2], dtype=np.float32)
+            if not np.isfinite(arr).all():
+                raise RuntimeError("Video generation produced invalid frames on this GPU")
+            scale = 255.0 if float(arr.max()) > 1.5 else 1.0
+            if float(arr.std()) / scale < 0.005:
+                raise RuntimeError("Video generation produced empty frames on this GPU")
+        except RuntimeError:
+            raise
+        except Exception:
+            pass
 
     # Save
     from diffusers.utils import export_to_video
@@ -284,7 +349,7 @@ async def generate_video(
         "duration_seconds": duration,
         "ai_generated": True,
         "ai_prompt": prompt,
-        "ai_model": "wan2.1-t2v-1.3b",
+        "ai_model": VIDEO_MODEL_NAME,
     }
 
 
