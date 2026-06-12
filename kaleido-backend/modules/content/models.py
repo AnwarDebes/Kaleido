@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Integer, ARRAY, Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -105,3 +105,20 @@ class MediaFile(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ManualStat(Base):
+    """Self-reported results for posts shared manually. Clearly labeled as
+    user-entered in the UI; never mixed silently with platform metrics."""
+
+    __tablename__ = "manual_stats"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str] = mapped_column(String(50), nullable=False)
+    views: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    comments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shares: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    noted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

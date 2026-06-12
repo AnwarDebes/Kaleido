@@ -62,6 +62,15 @@ class GeneratePostRequest(BaseModel):
     language: str = "en"
 
 
+class RepurposeRequest(BaseModel):
+    brand_id: uuid.UUID | None = None
+    source_text: str = Field(min_length=10, max_length=20000)
+    platforms: list[str] = Field(default=["Instagram", "Twitter / X", "LinkedIn"])
+    tone: str = "professional"
+    language: str = "en"
+    create_draft: bool = False
+
+
 class EnhancePostRequest(BaseModel):
     instructions: str = "Make it more engaging"
     platform: str = "instagram"

@@ -85,3 +85,83 @@ async def get_best_times(
         "success": True,
         "data": [BestTimeSlot(**d).model_dump() for d in data],
     }
+
+
+@router.get("/activity")
+async def get_activity(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Honest local activity stats: posting streak, counts, and totals of
+    self-reported results. No platform data involved."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func, select
+
+    from modules.content.models import ManualStat, Post
+
+    # All distinct days (UTC) the user published something
+    result = await db.execute(
+        select(func.date(Post.published_at))
+        .where(
+            Post.user_id == user.id,
+            Post.published_at.isnot(None),
+            Post.deleted_at.is_(None),
+        )
+        .distinct()
+    )
+    days = {d for (d,) in result.all() if d is not None}
+
+    today = datetime.now(timezone.utc).date()
+    streak = 0
+    cursor = today if today in days else today - timedelta(days=1)
+    while cursor in days:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    week_start = today - timedelta(days=today.weekday())
+    result = await db.execute(
+        select(func.count(Post.id)).where(
+            Post.user_id == user.id,
+            Post.published_at.isnot(None),
+            Post.deleted_at.is_(None),
+            func.date(Post.published_at) >= week_start,
+        )
+    )
+    published_this_week = result.scalar() or 0
+
+    result = await db.execute(
+        select(func.count(Post.id)).where(
+            Post.user_id == user.id,
+            Post.status == "published",
+            Post.deleted_at.is_(None),
+        )
+    )
+    published_total = result.scalar() or 0
+
+    result = await db.execute(
+        select(
+            func.coalesce(func.sum(ManualStat.views), 0),
+            func.coalesce(func.sum(ManualStat.likes), 0),
+            func.coalesce(func.sum(ManualStat.comments), 0),
+            func.coalesce(func.sum(ManualStat.shares), 0),
+            func.count(ManualStat.id),
+        ).where(ManualStat.user_id == user.id)
+    )
+    views, likes, comments, shares, entries = result.one()
+
+    return {
+        "success": True,
+        "data": {
+            "streak_days": streak,
+            "published_this_week": published_this_week,
+            "published_total": published_total,
+            "self_reported": {
+                "entries": entries,
+                "views": int(views),
+                "likes": int(likes),
+                "comments": int(comments),
+                "shares": int(shares),
+            },
+        },
+    }
