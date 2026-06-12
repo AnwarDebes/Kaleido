@@ -41,6 +41,9 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "populate_by_name": True,
+        # .env also carries keys for shell scripts (tunnel, cloudflare);
+        # ignore anything this class does not declare.
+        "extra": "ignore",
     }
 
 
