@@ -18,9 +18,11 @@ import {
   UserPlus,
   UserMinus,
   X,
+  Download,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
+import { downloadText, safeFilename } from "@/lib/download";
 
 interface Newsletter {
   id: string;
@@ -249,6 +251,41 @@ export default function NewslettersPage() {
     }
   }
 
+  function downloadNewsletter(nl: Newsletter) {
+    const body = nl.content_markdown || "";
+    const md = [
+      "---",
+      `subject: ${JSON.stringify(nl.subject)}`,
+      nl.preview_text ? `preview: ${JSON.stringify(nl.preview_text)}` : null,
+      `status: ${nl.status}`,
+      `created_at: ${nl.created_at}`,
+      "---",
+      "",
+      body,
+      "",
+    ].filter(Boolean).join("\n");
+    const name = safeFilename(nl.subject || "newsletter");
+    downloadText(`${name}.md`, md, "text/markdown");
+  }
+
+  function exportSubscribers() {
+    if (subscribers.length === 0) {
+      setError("No subscribers to export yet.");
+      return;
+    }
+    // Plain CSV, easy to import into Mailchimp, Sendgrid, Substack, etc.
+    const escape = (s: string | undefined) =>
+      s == null ? "" : `"${s.replace(/"/g, '""')}"`;
+    const rows = [
+      "email,name,status,subscribed_at",
+      ...subscribers.map(
+        (s) => `${escape(s.email)},${escape(s.name)},${escape(s.status || "active")},${escape(s.subscribed_at)}`,
+      ),
+    ];
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadText(`kaleido-subscribers-${stamp}.csv`, rows.join("\n"), "text/csv");
+  }
+
   const inputClasses =
     "w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors";
 
@@ -289,13 +326,24 @@ export default function NewslettersPage() {
           </div>
         )}
         {view === "list" && tab === "subscribers" && (
-          <button
-            onClick={() => setShowAddSub(true)}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
-          >
-            <UserPlus className="h-4 w-4" />
-            Add Subscriber
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={exportSubscribers}
+              disabled={subscribers.length === 0}
+              className="flex items-center gap-2 rounded-lg border border-card-border px-3 py-2.5 text-sm font-medium hover:border-amber-500/30 transition-colors disabled:opacity-50"
+              title="Download subscribers as CSV"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
+            <button
+              onClick={() => setShowAddSub(true)}
+              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Subscriber
+            </button>
+          </div>
         )}
       </div>
 
@@ -412,6 +460,13 @@ export default function NewslettersPage() {
                         </button>
                       </>
                     )}
+                    <button
+                      onClick={() => downloadNewsletter(nl)}
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-500/10 transition-colors"
+                      title="Download as .md"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       onClick={() => deleteNewsletter(nl.id)}
                       className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"

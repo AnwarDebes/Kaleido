@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Image as ImageIcon,
@@ -19,11 +19,16 @@ import {
   ChevronRight,
   Filter,
   Clock,
+  Download,
+  Share2,
+  PenLine,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNotificationStore } from "@/lib/notifications";
+import { downloadRemote, safeFilename } from "@/lib/download";
+import ShareModal, { type ShareModalContent } from "@/components/dashboard/ShareModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 interface MediaItem {
   id: string;
@@ -110,6 +115,7 @@ function ProgressButton({
 }
 
 export default function MediaPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -139,6 +145,12 @@ export default function MediaPage() {
 
   // Preview modal
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
+
+  // Write post from image (vision AI)
+  const [writingPostId, setWritingPostId] = useState<string | null>(null);
+
+  // Share modal
+  const [shareContent, setShareContent] = useState<ShareModalContent | null>(null);
 
   // New folder
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -253,8 +265,9 @@ export default function MediaPage() {
         const generated = res.data.data;
         if (generated) setPreviewItem(generated);
         addToast({ type: "success", title: "Image generated!" });
-      } catch {
-        setError("Image generation failed. Please try again.");
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: { message?: string } } } };
+        setError(e.response?.data?.error?.message || "Image generation failed. Please try again.");
       } finally {
         setGenerating(false);
         if (genTimerRef.current) clearInterval(genTimerRef.current);
@@ -289,11 +302,45 @@ export default function MediaPage() {
         addToast({
           type: "info",
           title: "Video generation started",
-          message: `${dur}s video — you can keep working while it generates`,
+          message: `${dur}s video. You can keep working while it generates`,
         });
       } catch {
         setError("Failed to start video generation. Please try again.");
       }
+    }
+  }
+
+  async function handleWritePost(item: MediaItem) {
+    if (writingPostId) return;
+    setWritingPostId(item.id);
+    try {
+      await api.post(
+        "/posts/from-image",
+        {
+          media_id: item.id,
+          platforms: ["Instagram", "Twitter / X", "LinkedIn"],
+          tone: "casual",
+          language: "en",
+          context: "",
+          create_draft: true,
+        },
+        { timeout: 300000 }
+      );
+      addToast({
+        type: "success",
+        title: "Draft created from your image",
+        message: "The AI looked at your image and wrote captions for Instagram, X, and LinkedIn.",
+        action: { label: "Find it in Posts", onClick: () => router.push("/dashboard/posts") },
+      });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: { message?: string } } } };
+      addToast({
+        type: "error",
+        title: "Could not write a post",
+        message: e.response?.data?.error?.message || "Something went wrong while reading your image. Please try again.",
+      });
+    } finally {
+      setWritingPostId(null);
     }
   }
 
@@ -329,6 +376,41 @@ export default function MediaPage() {
       item.file_type === "video" ||
       /\.(mp4|webm|mov|avi)$/i.test(item.filename)
     );
+  }
+
+  async function downloadMedia(item: MediaItem) {
+    const ext = item.filename.includes(".")
+      ? item.filename.slice(item.filename.lastIndexOf("."))
+      : isVideo(item)
+      ? ".mp4"
+      : ".png";
+    const base = safeFilename(item.ai_prompt || item.filename.replace(/\.[^.]+$/, "") || "kaleido");
+    await downloadRemote(mediaUrl(item), `${base}${ext}`);
+    addToast({ type: "success", title: "Download started", message: item.filename });
+  }
+
+  function openShareForMedia(item: MediaItem) {
+    const ext = item.filename.includes(".")
+      ? item.filename.slice(item.filename.lastIndexOf("."))
+      : isVideo(item)
+      ? ".mp4"
+      : ".png";
+    const base = safeFilename(item.ai_prompt || item.filename.replace(/\.[^.]+$/, "") || "kaleido");
+    setShareContent({
+      title: isVideo(item) ? "Share or download video" : "Share or download image",
+      subtitle: item.ai_prompt
+        ? `AI generated · "${item.ai_prompt.slice(0, 80)}${item.ai_prompt.length > 80 ? "…" : ""}"`
+        : "Pick a destination",
+      text: item.ai_prompt || "",
+      media: [
+        {
+          url: mediaUrl(item),
+          filename: `${base}${ext}`,
+          kind: isVideo(item) ? "video" : "image",
+        },
+      ],
+      suggestedName: base,
+    });
   }
 
   function formatSize(bytes?: number): string {
@@ -659,16 +741,62 @@ export default function MediaPage() {
                           </div>
                         </div>
                       )}
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(item.id);
-                        }}
-                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 rounded-md bg-red-500/80 backdrop-blur-sm p-1.5 text-white hover:bg-red-600 transition-all"
+                      {/* Quick action buttons (write post / download / share / delete) */}
+                      <div
+                        className={`absolute bottom-2 right-2 flex gap-1 transition-all ${
+                          writingPostId === item.id
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100"
+                        }`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                        {item.file_type === "image" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleWritePost(item);
+                            }}
+                            disabled={writingPostId !== null}
+                            className="rounded-md bg-stone-900/70 backdrop-blur-sm p-1.5 text-white hover:bg-stone-900 transition-colors disabled:opacity-60"
+                            title="Write a post about this image"
+                          >
+                            {writingPostId === item.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <PenLine className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadMedia(item);
+                          }}
+                          className="rounded-md bg-stone-900/70 backdrop-blur-sm p-1.5 text-white hover:bg-stone-900 transition-colors"
+                          title="Download"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openShareForMedia(item);
+                          }}
+                          className="rounded-md bg-amber-500/80 backdrop-blur-sm p-1.5 text-white hover:bg-amber-600 transition-colors"
+                          title="Share"
+                        >
+                          <Share2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id);
+                          }}
+                          className="rounded-md bg-red-500/80 backdrop-blur-sm p-1.5 text-white hover:bg-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="p-2 sm:p-3">
                       <p className="text-xs font-medium truncate">
@@ -935,7 +1063,7 @@ export default function MediaPage() {
                       />
                     </div>
                     <p className="text-xs text-muted mt-2 text-center">
-                      {Math.min(Math.round((genElapsed / estimatedGenTime) * 100), 95)}% — est. {Math.ceil(estimatedGenTime / 60)} min
+                      {Math.min(Math.round((genElapsed / estimatedGenTime) * 100), 95)}%, est. {Math.ceil(estimatedGenTime / 60)} min
                     </p>
                   </div>
                 )}
@@ -1032,18 +1160,59 @@ export default function MediaPage() {
                       )}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(previewItem.id)}
-                    className="shrink-0 rounded-lg bg-red-500/10 p-2 text-red-500 hover:bg-red-500/20 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {previewItem.file_type === "image" && (
+                      <button
+                        onClick={() => handleWritePost(previewItem)}
+                        disabled={writingPostId !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-card-border px-3 py-2 text-xs font-medium hover:border-amber-500/30 transition-colors disabled:opacity-60"
+                        title="Write a post about this image"
+                      >
+                        {writingPostId === previewItem.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <PenLine className="h-3.5 w-3.5" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {writingPostId === previewItem.id ? "Writing..." : "Write post"}
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => downloadMedia(previewItem)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-card-border px-3 py-2 text-xs font-medium hover:border-amber-500/30 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Download</span>
+                    </button>
+                    <button
+                      onClick={() => openShareForMedia(previewItem)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(previewItem.id)}
+                      className="rounded-lg bg-red-500/10 p-2 text-red-500 hover:bg-red-500/20 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Share / download modal */}
+      <ShareModal
+        open={shareContent !== null}
+        onClose={() => setShareContent(null)}
+        content={shareContent}
+      />
     </div>
   );
 }

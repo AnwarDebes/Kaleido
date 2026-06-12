@@ -339,7 +339,9 @@ export default function CampaignsPage() {
           ) : (
             <div className="glass-card p-8 text-center">
               <p className="text-sm text-muted">
-                No analytics data available for this campaign yet.
+                No analytics data for this campaign yet. Metrics appear once
+                posts are published through a connected account. Posts shared
+                manually will not report numbers here.
               </p>
             </div>
           )}

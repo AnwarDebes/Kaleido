@@ -191,10 +191,10 @@ export default function VideoJobTracker() {
             return;
           }
 
-          // Still generating — poll again
+          // Still generating, poll again
           setTimeout(poll, 3000);
         } catch {
-          // Network error — retry
+          // Network error, retry
           setTimeout(poll, 5000);
         }
       };

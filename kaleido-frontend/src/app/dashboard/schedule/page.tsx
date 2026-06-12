@@ -15,8 +15,14 @@ import {
   CalendarOff,
   RotateCcw,
   Plus,
+  Download,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { PLATFORM_LABELS, platformByLabel } from "@/lib/platforms";
+import { buildIcs } from "@/lib/ics";
+import { downloadText } from "@/lib/download";
+import ShareModal, { type ShareModalContent } from "@/components/dashboard/ShareModal";
+import { useNotificationStore } from "@/lib/notifications";
 import clsx from "clsx";
 import {
   format,
@@ -68,23 +74,26 @@ interface SuggestTimeResponse {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const PLATFORMS = [
-  "Facebook",
-  "Instagram",
-  "Twitter/X",
-  "LinkedIn",
-  "TikTok",
-  "YouTube",
-  "Pinterest",
-  "Reddit",
-  "Bluesky",
-];
+const PLATFORMS = PLATFORM_LABELS;
 
 const STATUS_COLORS: Record<string, string> = {
   scheduled: "bg-blue-500",
+  publishing: "bg-blue-400",
   published: "bg-green-500",
+  partially_published: "bg-amber-500",
+  needs_manual_share: "bg-amber-500",
   failed: "bg-red-500",
   draft: "bg-stone-400",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: "Scheduled",
+  publishing: "Publishing",
+  published: "Published",
+  partially_published: "Partly published",
+  needs_manual_share: "Share manually",
+  failed: "Failed",
+  draft: "Draft",
 };
 
 /* ---------- helpers ---------- */
@@ -127,6 +136,8 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [shareContent, setShareContent] = useState<ShareModalContent | null>(null);
+  const { addToast } = useNotificationStore();
 
   // suggest time
   const [suggestPlatform, setSuggestPlatform] = useState("Instagram");
@@ -237,16 +248,97 @@ export default function SchedulePage() {
     }
   }
 
+  function openShareForScheduled(post: ScheduledPost) {
+    const labels = Object.keys(post.platform_contents || {});
+    const platformIds = labels
+      .map((label) => platformByLabel(label)?.id || label.toLowerCase())
+      .filter(Boolean);
+    setShareContent({
+      title: "Share this post manually",
+      subtitle: "These platforms are not connected yet, so copy or download and post yourself.",
+      text: post.content_text || "",
+      platformIds,
+      suggestedName: (post.content_text || "post").split("\n")[0],
+    });
+  }
+
   async function handlePublishNow(postId: string) {
     setActionLoading(postId);
+    const post = scheduledPosts.find((p) => (p.post_id || p.id) === postId || p.id === postId);
     try {
-      await api.post(`/schedule/posts/${postId}/publish`);
+      const res = await api.post(`/schedule/posts/${postId}/publish`);
+      const updated = res.data?.data as
+        | {
+            status?: string;
+            publication_summary?: {
+              platform: string;
+              status: "published" | "failed" | "not_connected";
+              reason?: string | null;
+            }[];
+          }
+        | undefined;
+      const status = updated?.status;
+      const summary = updated?.publication_summary || [];
+      const byStatus = (s: string) =>
+        summary.filter((entry) => entry.status === s).map((entry) => entry.platform);
+      const published = byStatus("published");
+      const failedPlatforms = byStatus("failed");
+      const notConnected = byStatus("not_connected");
+
+      if (status === "draft" || status === "needs_manual_share") {
+        if (post) openShareForScheduled(post);
+        addToast({
+          type: "info",
+          title: "Not connected yet",
+          message:
+            notConnected.length > 0
+              ? `${notConnected.join(", ")}: copy or download and post manually.`
+              : "No connected account for those platforms yet. Copy or download and post manually.",
+          duration: 8000,
+        });
+      } else if (status === "published") {
+        addToast({
+          type: "success",
+          title: "Published",
+          message: published.length > 0 ? `Live on ${published.join(", ")}.` : undefined,
+        });
+      } else if (status === "partially_published" || status === "failed") {
+        const parts: string[] = [];
+        if (published.length > 0) parts.push(`Published: ${published.join(", ")}.`);
+        if (failedPlatforms.length > 0) parts.push(`Failed: ${failedPlatforms.join(", ")}.`);
+        if (notConnected.length > 0)
+          parts.push(`Not connected, share manually: ${notConnected.join(", ")}.`);
+        setError(parts.length > 0 ? parts.join(" ") : "Publish did not complete on every platform.");
+      }
       fetchCalendar();
     } catch {
-      setError("Failed to publish post.");
+      if (post) openShareForScheduled(post);
+      setError(
+        "Direct publish failed. The share menu is open so you can download or post manually.",
+      );
     } finally {
       setActionLoading(null);
     }
+  }
+
+  function exportIcs() {
+    if (scheduledPosts.length === 0) {
+      setError("No scheduled posts in this view to export.");
+      return;
+    }
+    const events = scheduledPosts.map((post) => {
+      const platforms = Object.keys(post.platform_contents || {}).join(", ");
+      const body = post.content_text || "Kaleido post";
+      const summary = `${platforms ? `[${platforms}] ` : ""}${body.split("\n")[0].slice(0, 80)}`;
+      return {
+        uid: `kaleido-${post.id}@kaleido.social`,
+        start: new Date(post.scheduled_at),
+        summary,
+        description: body,
+      };
+    });
+    const ics = buildIcs(events, `Kaleido ${format(currentMonth, "MMMM yyyy")}`);
+    downloadText(`kaleido-${format(currentMonth, "yyyy-MM")}.ics`, ics, "text/calendar");
   }
 
   async function handleSuggestTime() {
@@ -281,13 +373,21 @@ export default function SchedulePage() {
         <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Schedule</h1>
 
         {/* month navigation */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={openScheduleModal}
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
           >
             <Plus className="h-4 w-4" />
             Schedule Post
+          </button>
+          <button
+            onClick={exportIcs}
+            title="Download the visible month as a calendar file (.ics)"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-card-border hover:bg-stone-50 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Export .ics</span>
           </button>
           <button
             onClick={goToday}
@@ -311,6 +411,17 @@ export default function SchedulePage() {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+      </div>
+
+      {/* manual-share notice */}
+      <div className="mb-6 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+        <Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+        <span>
+          Heads up: platforms that are not connected will not auto-publish. When a scheduled
+          post comes due without a connected account, it is marked
+          <span className="font-semibold"> Share manually</span> and stays on the calendar,
+          and Publish Now opens the share menu so you can post it yourself.
+        </span>
       </div>
 
       {/* error */}
@@ -570,7 +681,7 @@ export default function SchedulePage() {
               {Object.entries(STATUS_COLORS).map(([status, color]) => (
                 <div key={status} className="flex items-center gap-2">
                   <span className={clsx("h-2.5 w-2.5 rounded-full", color)} />
-                  <span className="text-xs capitalize">{status}</span>
+                  <span className="text-xs">{STATUS_LABELS[status] || status}</span>
                 </div>
               ))}
             </div>
@@ -686,6 +797,12 @@ export default function SchedulePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ShareModal
+        open={!!shareContent}
+        onClose={() => setShareContent(null)}
+        content={shareContent}
+      />
     </div>
   );
 }

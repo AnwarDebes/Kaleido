@@ -19,10 +19,19 @@ import {
   ChevronRight,
   Loader2,
   Image as ImageIcon,
+  Share2,
+  Download,
+  Package,
+  Smartphone,
+  BarChart3,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import clsx from "clsx";
 import { format } from "date-fns";
+import { PLATFORM_LABELS, platformByLabel } from "@/lib/platforms";
+import ShareModal, { type ShareModalContent } from "@/components/dashboard/ShareModal";
+import { downloadText, safeFilename } from "@/lib/download";
+import { useNotificationStore } from "@/lib/notifications";
 
 /* ---------- types ---------- */
 
@@ -32,7 +41,14 @@ interface Post {
   platform_contents: Record<string, { text: string; hashtags: string[] }>;
   content_type: string;
   hashtags: string[] | null;
-  status: "draft" | "scheduled" | "published" | "failed";
+  status:
+    | "draft"
+    | "scheduled"
+    | "publishing"
+    | "published"
+    | "partially_published"
+    | "needs_manual_share"
+    | "failed";
   ai_generated: boolean;
   brand_id?: string;
   scheduled_at?: string;
@@ -83,19 +99,27 @@ const STATUS_CONFIG: Record<
     bg: "bg-red-50",
     icon: <AlertCircle className="h-3 w-3" />,
   },
+  publishing: {
+    label: "Publishing",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    icon: <Loader2 className="h-3 w-3 animate-spin" />,
+  },
+  partially_published: {
+    label: "Partly published",
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+    icon: <AlertCircle className="h-3 w-3" />,
+  },
+  needs_manual_share: {
+    label: "Share manually",
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+    icon: <Share2 className="h-3 w-3" />,
+  },
 };
 
-const PLATFORMS = [
-  "Facebook",
-  "Instagram",
-  "Twitter/X",
-  "LinkedIn",
-  "TikTok",
-  "YouTube",
-  "Pinterest",
-  "Reddit",
-  "Bluesky",
-];
+const PLATFORMS = PLATFORM_LABELS;
 
 const TONES = ["professional", "casual", "humorous", "informative", "persuasive"];
 const LANGUAGES = ["English", "Norwegian", "Arabic"];
@@ -155,6 +179,19 @@ export default function PostsPage() {
   // action loading
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // share/download modal
+  const [shareContent, setShareContent] = useState<ShareModalContent | null>(null);
+  const { addToast } = useNotificationStore();
+
+  // hashtag suggestions (editor)
+  const [suggestingTags, setSuggestingTags] = useState(false);
+
+  // self-reported results modal
+  const [statsPost, setStatsPost] = useState<Post | null>(null);
+  const [statsPlatform, setStatsPlatform] = useState("");
+  const [statsValues, setStatsValues] = useState({ views: "", likes: "", comments: "", shares: "" });
+  const [statsSaving, setStatsSaving] = useState(false);
+
   /* fetch posts */
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -182,6 +219,8 @@ export default function PostsPage() {
   // Auto-open modals from URL params
   useEffect(() => {
     const action = searchParams.get("action");
+    const topic = searchParams.get("topic");
+    if (topic) setAiTopic(topic);
     if (action === "generate") setShowAIGenerate(true);
     else if (action === "create") openNewPost();
   }, [searchParams]);
@@ -256,14 +295,271 @@ export default function PostsPage() {
 
   async function handlePublishNow(id: string) {
     setActionLoading(id);
+    const post = posts.find((p) => p.id === id);
     try {
-      await api.post(`/schedule/posts/${id}/publish`);
-      fetchPosts();
+      const res = await api.post(`/schedule/posts/${id}/publish`);
+      const updated = res.data?.data as
+        | (Partial<Post> & {
+            publication_summary?: {
+              platform: string;
+              status: "published" | "failed" | "not_connected";
+              reason?: string | null;
+            }[];
+          })
+        | undefined;
+      const status = updated?.status;
+      const summary = updated?.publication_summary || [];
+      const byStatus = (s: string) =>
+        summary.filter((entry) => entry.status === s).map((entry) => entry.platform);
+      const published = byStatus("published");
+      const failedPlatforms = byStatus("failed");
+      const notConnected = byStatus("not_connected");
+      await fetchPosts();
+      if ((status === "draft" || status === "needs_manual_share") && post) {
+        // No connected account was available, an expected outcome in
+        // manual-share mode. Open the share modal so the user can post.
+        openShareForPost(post);
+        addToast({
+          type: "info",
+          title: "Not connected yet",
+          message:
+            notConnected.length > 0
+              ? `${notConnected.join(", ")}: copy or download from the share menu and post manually.`
+              : "Copy or download from the share menu and post manually.",
+          duration: 8000,
+        });
+      } else if (status === "published") {
+        addToast({
+          type: "success",
+          title: "Published",
+          message: published.length > 0 ? `Live on ${published.join(", ")}.` : undefined,
+        });
+      } else if (status === "partially_published" || status === "failed") {
+        const parts: string[] = [];
+        if (published.length > 0) parts.push(`Published: ${published.join(", ")}.`);
+        if (failedPlatforms.length > 0) parts.push(`Failed: ${failedPlatforms.join(", ")}.`);
+        if (notConnected.length > 0)
+          parts.push(`Not connected, share manually: ${notConnected.join(", ")}.`);
+        setError(
+          parts.length > 0
+            ? parts.join(" ")
+            : status === "failed"
+              ? "Publish failed on every platform. Use the share menu as a fallback."
+              : "Published on some platforms but not others. The post details show which.",
+        );
+      }
     } catch {
-      setError("Failed to publish post.");
+      if (post) openShareForPost(post);
+      setError(
+        "Direct publish failed. Most likely that platform's account isn't connected or its API isn't approved yet. The post is open in the share menu so you can download or post manually.",
+      );
     } finally {
       setActionLoading(null);
     }
+  }
+
+  async function handleSuggestHashtags() {
+    if (!editorText.trim()) return;
+    setSuggestingTags(true);
+    try {
+      const res = await api.post(
+        "/posts/suggest-hashtags",
+        { text: editorText, platform: (editorPlatforms[0] || "instagram").toLowerCase() },
+        { timeout: 300000 },
+      );
+      const tags: string[] = res.data?.data?.hashtags || [];
+      if (tags.length === 0) {
+        addToast({ type: "info", title: "No suggestions", message: "Try writing a bit more text first." });
+        return;
+      }
+      const line = tags.slice(0, 10).map((t) => `#${t}`).join(" ");
+      setEditorText((prev) => `${prev.trimEnd()}\n\n${line}`);
+      addToast({ type: "success", title: "Hashtags added", message: "Edit or remove any you do not want." });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: { message?: string } } } };
+      addToast({
+        type: "error",
+        title: "Could not suggest hashtags",
+        message: e.response?.data?.error?.message || "Please try again.",
+      });
+    } finally {
+      setSuggestingTags(false);
+    }
+  }
+
+  async function handleMarkPosted(post: Post) {
+    setActionLoading(post.id);
+    try {
+      await api.post(`/posts/${post.id}/mark-posted`, {
+        platforms: Object.keys(post.platform_contents || {}),
+      });
+      await fetchPosts();
+      addToast({
+        type: "success",
+        title: "Marked as posted",
+        message: "Nice. Use Log results later to track how it did.",
+      });
+    } catch {
+      addToast({ type: "error", title: "Could not update the post", message: "Please try again." });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function openStatsModal(post: Post) {
+    setStatsPost(post);
+    setStatsPlatform(Object.keys(post.platform_contents || {})[0] || "Instagram");
+    setStatsValues({ views: "", likes: "", comments: "", shares: "" });
+  }
+
+  async function handleSaveStats() {
+    if (!statsPost) return;
+    setStatsSaving(true);
+    try {
+      await api.post(`/posts/${statsPost.id}/stats`, {
+        platform: statsPlatform,
+        views: parseInt(statsValues.views) || 0,
+        likes: parseInt(statsValues.likes) || 0,
+        comments: parseInt(statsValues.comments) || 0,
+        shares: parseInt(statsValues.shares) || 0,
+      });
+      setStatsPost(null);
+      addToast({
+        type: "success",
+        title: "Results saved",
+        message: "Self-reported numbers show up on the Analytics page.",
+      });
+    } catch {
+      addToast({ type: "error", title: "Could not save results", message: "Please try again." });
+    } finally {
+      setStatsSaving(false);
+    }
+  }
+
+  async function handleDownloadPack(post: Post) {
+    setActionLoading(post.id);
+    try {
+      const res = await api.get(`/posts/${post.id}/pack`, { responseType: "blob" });
+      const name = `kaleido-${safeFilename((post.content_text || "post").split("\n")[0])}.zip`;
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      addToast({
+        type: "success",
+        title: "Pack downloaded",
+        message: "Captions, hashtags, media and a checklist, one folder per platform.",
+      });
+    } catch {
+      addToast({ type: "error", title: "Could not build the pack", message: "Please try again." });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSendToPhone(post: Post) {
+    setActionLoading(post.id);
+    try {
+      const res = await api.post(`/posts/${post.id}/send-to-phone`);
+      const filesSent = res.data?.data?.files_sent ?? 0;
+      addToast({
+        type: "success",
+        title: "Sent to your phone",
+        message:
+          filesSent > 0
+            ? `Caption plus ${filesSent} media file${filesSent === 1 ? "" : "s"} are in your Telegram.`
+            : "The caption is in your Telegram, ready to paste.",
+      });
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { error?: { message?: string } } } };
+      if (e.response?.status === 400) {
+        addToast({
+          type: "info",
+          title: "Connect Telegram first",
+          message: "Set up Send to phone in Settings, it takes two minutes.",
+          duration: 8000,
+        });
+      } else {
+        addToast({
+          type: "error",
+          title: "Could not send",
+          message: e.response?.data?.error?.message || "Please try again.",
+        });
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function openShareForPost(post: Post) {
+    const platformIds = Object.keys(post.platform_contents || {})
+      .map((label) => platformByLabel(label)?.id || label.toLowerCase())
+      .filter(Boolean);
+
+    // Prefer per-platform content if it differs; otherwise fall back to base text
+    const baseText = post.content_text || "";
+    const firstPlatformContent =
+      Object.values(post.platform_contents || {}).find((c) => c?.text)?.text || baseText;
+
+    setShareContent({
+      title: "Share or download post",
+      subtitle: post.ai_generated ? "AI generated · pick a destination" : "Pick a destination",
+      text: firstPlatformContent,
+      hashtags: post.hashtags ?? Object.values(post.platform_contents || {}).flatMap((c) => c?.hashtags || []),
+      platformIds,
+      suggestedName: baseText.split("\n")[0] || "post",
+    });
+  }
+
+  function exportAll() {
+    if (posts.length === 0) return;
+    const payload = {
+      exported_at: new Date().toISOString(),
+      filter,
+      total: posts.length,
+      posts: posts.map((p) => ({
+        id: p.id,
+        status: p.status,
+        content_text: p.content_text,
+        platform_contents: p.platform_contents,
+        hashtags: p.hashtags,
+        ai_generated: p.ai_generated,
+        scheduled_at: p.scheduled_at,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      })),
+    };
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadText(`kaleido-posts-${filter}-${stamp}.json`, JSON.stringify(payload, null, 2), "application/json");
+  }
+
+  function quickDownloadPost(post: Post) {
+    const platformContents = post.platform_contents || {};
+    const lines: string[] = [];
+    lines.push(`# Kaleido draft`);
+    lines.push(`created: ${post.created_at}`);
+    if (post.status) lines.push(`status: ${post.status}`);
+    lines.push("");
+    if (post.content_text) {
+      lines.push("## Base text");
+      lines.push(post.content_text);
+      lines.push("");
+    }
+    for (const [platform, payload] of Object.entries(platformContents)) {
+      lines.push(`## ${platform}`);
+      if (payload?.text) lines.push(payload.text);
+      if (payload?.hashtags && payload.hashtags.length > 0) {
+        lines.push("");
+        lines.push(payload.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" "));
+      }
+      lines.push("");
+    }
+    const name = safeFilename(post.content_text?.split("\n")[0] || "post");
+    downloadText(`${name}.md`, lines.join("\n"), "text/markdown");
   }
 
   async function handleAIGenerate() {
@@ -301,7 +597,16 @@ export default function PostsPage() {
       {/* header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Posts</h1>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={exportAll}
+            disabled={posts.length === 0}
+            title="Download every post on this page as JSON"
+            className="inline-flex items-center gap-2 rounded-lg border border-card-border px-3 py-2 text-sm font-medium text-muted hover:text-foreground hover:border-amber-500/30 transition-colors disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export JSON</span>
+          </button>
           <button
             onClick={() => setShowAIGenerate(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
@@ -445,6 +750,64 @@ export default function PostsPage() {
                       <span className="hidden sm:inline">Edit</span>
                     </button>
                     <button
+                      onClick={() => openShareForPost(post)}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors"
+                      title="Share or copy"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                    <button
+                      onClick={() => quickDownloadPost(post)}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors"
+                      title="Download as markdown"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Download</span>
+                    </button>
+                    <button
+                      onClick={() => handleDownloadPack(post)}
+                      disabled={isActioning}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors disabled:opacity-50"
+                      title="Download pack (.zip with captions, media and checklist)"
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Pack</span>
+                    </button>
+                    <button
+                      onClick={() => handleSendToPhone(post)}
+                      disabled={isActioning}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors disabled:opacity-50"
+                      title="Send to your phone via Telegram"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">To phone</span>
+                    </button>
+                    {(post.status === "draft" ||
+                      post.status === "needs_manual_share" ||
+                      post.status === "scheduled") && (
+                      <button
+                        onClick={() => handleMarkPosted(post)}
+                        disabled={isActioning}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                        title="I posted this manually"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Posted it</span>
+                      </button>
+                    )}
+                    {(post.status === "published" ||
+                      post.status === "partially_published") && (
+                      <button
+                        onClick={() => openStatsModal(post)}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors"
+                        title="Log the results this post got (self-reported)"
+                      >
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Log results</span>
+                      </button>
+                    )}
+                    <button
                       onClick={() => handleDelete(post.id)}
                       disabled={isActioning}
                       className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
@@ -568,9 +931,22 @@ export default function PostsPage() {
                   className="w-full rounded-lg border border-card-border bg-background px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors resize-none"
                   placeholder="Write your post content..."
                 />
-                <p className="mt-1 text-xs text-muted text-right">
-                  {editorText.length} characters
-                </p>
+                <div className="mt-1 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleSuggestHashtags}
+                    disabled={suggestingTags || !editorText.trim()}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-500 disabled:opacity-50"
+                  >
+                    {suggestingTags ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    Suggest hashtags
+                  </button>
+                  <p className="text-xs text-muted">{editorText.length} characters</p>
+                </div>
               </div>
 
               {/* platforms */}
@@ -595,16 +971,15 @@ export default function PostsPage() {
                 </div>
               </div>
 
-              {/* media placeholder */}
+              {/* media: direct user to the media library */}
               <div className="mb-6">
-                <button
-                  type="button"
-                  onClick={() => alert("Media upload coming soon!")}
+                <a
+                  href="/dashboard/media"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-card-border text-sm text-muted hover:text-foreground hover:border-stone-400 transition-colors"
                 >
                   <ImageIcon className="h-4 w-4" />
-                  Add Media (Coming soon)
-                </button>
+                  Manage media in Media Library
+                </a>
               </div>
 
               {/* actions */}
@@ -632,6 +1007,92 @@ export default function PostsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ===== Share / Download modal ===== */}
+      {/* self-reported results modal */}
+      <AnimatePresence>
+        {statsPost && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => !statsSaving && setStatsPost(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 sm:p-6"
+            >
+              <div className="flex items-start justify-between mb-1">
+                <h2 className="text-lg font-bold">Log results</h2>
+                <button
+                  onClick={() => setStatsPost(null)}
+                  className="rounded-lg p-2 text-muted hover:text-foreground hover:bg-amber-500/5 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-xs text-muted mb-4">
+                Numbers you read off the platform yourself. They are stored as self-reported
+                and shown on the Analytics page.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5">Platform</label>
+                  <select
+                    value={statsPlatform}
+                    onChange={(e) => setStatsPlatform(e.target.value)}
+                    className="w-full rounded-lg border border-card-border bg-background px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  >
+                    {(Object.keys(statsPost.platform_contents || {}).length > 0
+                      ? Object.keys(statsPost.platform_contents || {})
+                      : PLATFORMS
+                    ).map((pl) => (
+                      <option key={pl} value={pl}>
+                        {pl}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["views", "likes", "comments", "shares"] as const).map((k) => (
+                    <div key={k}>
+                      <label className="block text-xs font-medium mb-1.5 capitalize">{k}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={statsValues[k]}
+                        onChange={(e) =>
+                          setStatsValues((prev) => ({ ...prev, [k]: e.target.value }))
+                        }
+                        className="w-full rounded-lg border border-card-border bg-background px-3 py-2 text-sm outline-none focus:border-amber-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={handleSaveStats}
+                disabled={statsSaving}
+                className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow disabled:opacity-60"
+              >
+                {statsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Save results
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ShareModal
+        open={shareContent !== null}
+        onClose={() => setShareContent(null)}
+        content={shareContent}
+      />
 
       {/* ===== AI Generate Modal ===== */}
       <AnimatePresence>
@@ -783,7 +1244,7 @@ export default function PostsPage() {
                     </p>
                   </div>
 
-                  <div className="flex gap-3 justify-end">
+                  <div className="flex flex-wrap gap-3 justify-end">
                     <button
                       onClick={() => setAiResult("")}
                       className="px-4 py-2 rounded-lg text-sm font-medium border border-card-border hover:bg-stone-50 transition-colors"
@@ -791,10 +1252,28 @@ export default function PostsPage() {
                       Regenerate
                     </button>
                     <button
+                      onClick={() => {
+                        setShowAIGenerate(false);
+                        setShareContent({
+                          title: "Share or download generated post",
+                          subtitle: "Save the text now, or push it to a platform",
+                          text: aiResult,
+                          platformIds: aiPlatforms,
+                          suggestedName: aiTopic || "post",
+                        });
+                        setAiResult("");
+                        setAiTopic("");
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-card-border px-4 py-2 text-sm font-semibold hover:border-amber-500/30 transition-colors"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Share / Download
+                    </button>
+                    <button
                       onClick={useAIResult}
                       className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
                     >
-                      Use This Post
+                      Save as Draft
                     </button>
                   </div>
                 </>

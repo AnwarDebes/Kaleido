@@ -20,6 +20,9 @@ import {
   ChevronRight,
   Menu,
   X,
+  Share2,
+  Wand2,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import KaleidoLogo, { KaleidoIcon } from "@/components/KaleidoLogo";
@@ -33,6 +36,8 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Posts", href: "/dashboard/posts", icon: FileText },
+  { label: "Repurpose", href: "/dashboard/repurpose", icon: Wand2 },
+  { label: "Planner", href: "/dashboard/planner", icon: CalendarCheck },
   { label: "Schedule", href: "/dashboard/schedule", icon: Calendar },
   { label: "Media", href: "/dashboard/media", icon: Image },
   { label: "Campaigns", href: "/dashboard/campaigns", icon: Target },
@@ -41,6 +46,7 @@ const mainNavItems: NavItem[] = [
   { label: "Blog", href: "/dashboard/blog", icon: BookOpen },
   { label: "Newsletters", href: "/dashboard/newsletters", icon: Mail },
   { label: "Brands", href: "/dashboard/brands", icon: Building2 },
+  { label: "Connections", href: "/dashboard/connections", icon: Share2 },
 ];
 
 const bottomNavItems: NavItem[] = [

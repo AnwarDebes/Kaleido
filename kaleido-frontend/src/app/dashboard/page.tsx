@@ -18,6 +18,13 @@ import {
   AlertCircle,
   Image as ImageIcon,
   Film,
+  Share2,
+  Info,
+  Lightbulb,
+  RefreshCw,
+  Wand2,
+  CheckCircle2,
+  Flame,
 } from "lucide-react";
 
 interface User {
@@ -76,7 +83,13 @@ function StatusBadge({ status }: { status: string }) {
     published: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
     draft: "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
     scheduled: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    partially_published: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    needs_manual_share: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
     failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+  const labels: Record<string, string> = {
+    partially_published: "Partly published",
+    needs_manual_share: "Share manually",
   };
 
   return (
@@ -85,7 +98,7 @@ function StatusBadge({ status }: { status: string }) {
         styles[status] || styles.draft
       }`}
     >
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {labels[status] || status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
 }
@@ -110,13 +123,48 @@ function SkeletonRow() {
   );
 }
 
+interface Idea {
+  title: string;
+  description: string;
+  format: string;
+  topic: string;
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [connectedAccountCount, setConnectedAccountCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [ideasLoading, setIdeasLoading] = useState(true);
+  const [ideasError, setIdeasError] = useState(false);
+  const [activity, setActivity] = useState<{
+    streak_days: number;
+    published_this_week: number;
+    published_total: number;
+  } | null>(null);
+  const [hasBrand, setHasBrand] = useState<boolean | null>(null);
+  const [phoneConfigured, setPhoneConfigured] = useState<boolean | null>(null);
+
+  async function fetchIdeas(refresh = false) {
+    setIdeasLoading(true);
+    setIdeasError(false);
+    try {
+      const res = await api.get("/posts/ideas", { params: { count: 4, refresh } });
+      setIdeas(res.data?.data?.ideas || []);
+    } catch {
+      setIdeasError(true);
+    } finally {
+      setIdeasLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchIdeas();
+  }, []);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -142,12 +190,26 @@ export default function DashboardPage() {
       const futureDate = sevenDaysLater.toISOString().split("T")[0];
 
       // Fetch all data in parallel, handle each individually
-      const [overviewResult, postsResult, scheduleResult] =
+      const [overviewResult, postsResult, scheduleResult, accountsResult, activityResult, brandsResult, remindersResult] =
         await Promise.allSettled([
           api.get(`/analytics/overview?start_date=${startDate}&end_date=${endDate}`),
           api.get("/posts?page=1&per_page=5"),
           api.get(`/schedule/calendar?start_date=${endDate}&end_date=${futureDate}`),
+          api.get("/social-accounts"),
+          api.get("/analytics/activity"),
+          api.get("/brands"),
+          api.get("/notifications/reminders"),
         ]);
+
+      if (activityResult.status === "fulfilled") {
+        setActivity(activityResult.value.data.data || null);
+      }
+      if (brandsResult.status === "fulfilled") {
+        setHasBrand((brandsResult.value.data.data || []).length > 0);
+      }
+      if (remindersResult.status === "fulfilled") {
+        setPhoneConfigured(!!remindersResult.value.data.data?.configured);
+      }
 
       if (overviewResult.status === "fulfilled") {
         const overview = overviewResult.value.data.data || overviewResult.value.data;
@@ -176,6 +238,14 @@ export default function DashboardPage() {
       if (scheduleResult.status === "fulfilled") {
         const payload = scheduleResult.value.data;
         setScheduledPosts(payload.data || []);
+      }
+
+      if (accountsResult.status === "fulfilled") {
+        const payload = accountsResult.value.data;
+        const accounts = (payload.data || []) as Array<{ is_active?: boolean }>;
+        setConnectedAccountCount(accounts.filter((a) => a.is_active !== false).length);
+      } else {
+        setConnectedAccountCount(0);
       }
 
       setLoading(false);
@@ -244,6 +314,32 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* No-connector banner, honest about app review and what still works */}
+      {!loading && connectedAccountCount === 0 && (
+        <div className="glass-card p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-amber-300/40">
+          <div className="h-9 w-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+            <Info className="h-5 w-5 text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              No social accounts connected yet, and that&apos;s fine.
+            </p>
+            <p className="text-xs text-muted mt-0.5">
+              Our app is still under review with several platforms. You can already generate posts,
+              images, videos, blogs and newsletters here. Download or share each one with a single click.
+              Bluesky and Telegram connect instantly.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/connections"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow shrink-0"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Manage connections
+          </Link>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {loading
@@ -306,6 +402,13 @@ export default function DashboardPage() {
             AI Post
           </Link>
           <Link
+            href="/dashboard/repurpose"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-medium text-xs transition-colors"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+            Repurpose
+          </Link>
+          <Link
             href="/dashboard/media?generate=image"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium text-xs transition-colors"
           >
@@ -326,7 +429,169 @@ export default function DashboardPage() {
             <Calendar className="h-3.5 w-3.5" />
             Schedule
           </Link>
+          <Link
+            href="/dashboard/connections"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-card-border text-foreground/80 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium text-xs transition-colors"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Connections
+          </Link>
         </div>
+      </div>
+
+      {/* Getting started + streak */}
+      {(() => {
+        const items = [
+          {
+            done: hasBrand === true,
+            label: "Describe your brand",
+            hint: "Tone, audience and pillars make every AI result better.",
+            href: "/dashboard/brands",
+          },
+          {
+            done: (metrics?.total_posts ?? 0) > 0 || recentPosts.length > 0,
+            label: "Create your first post",
+            hint: "Write it yourself or let the AI draft it.",
+            href: "/dashboard/posts?action=generate",
+          },
+          {
+            done: (activity?.published_total ?? 0) > 0,
+            label: "Share something and mark it posted",
+            hint: "Use the Share menu or a Post Pack, then press Posted it.",
+            href: "/dashboard/posts",
+          },
+          {
+            done: phoneConfigured === true,
+            label: "Connect Send to phone",
+            hint: "Your posts arrive in Telegram ready to paste.",
+            href: "/dashboard/settings",
+          },
+        ];
+        const open = items.filter((i) => !i.done);
+        const ready = hasBrand !== null || phoneConfigured !== null || activity !== null;
+        if (!ready || open.length === 0) return null;
+        return (
+          <div className="glass-card p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-amber-500" />
+                Getting started
+              </h2>
+              <span className="text-xs text-muted">
+                {items.length - open.length} of {items.length} done
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {items.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`rounded-lg border p-4 transition-colors ${
+                    item.done
+                      ? "border-green-500/30 bg-green-500/5"
+                      : "border-card-border hover:border-amber-500/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2
+                      className={`h-4 w-4 shrink-0 ${item.done ? "text-green-500" : "text-stone-300 dark:text-stone-600"}`}
+                    />
+                    <p className={`text-sm font-medium ${item.done ? "line-through text-muted" : ""}`}>
+                      {item.label}
+                    </p>
+                  </div>
+                  {!item.done && <p className="text-xs text-muted mt-1.5">{item.hint}</p>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Posting streak */}
+      {activity && activity.published_total > 0 && (
+        <div className="glass-card px-6 py-4 mb-8 flex flex-wrap items-center gap-x-8 gap-y-2">
+          <div className="flex items-center gap-2">
+            <Flame className={`h-5 w-5 ${activity.streak_days > 0 ? "text-amber-500" : "text-stone-300"}`} />
+            <span className="text-sm">
+              <span className="font-bold">{activity.streak_days}</span>
+              <span className="text-muted"> day posting streak</span>
+            </span>
+          </div>
+          <span className="text-sm">
+            <span className="font-bold">{activity.published_this_week}</span>
+            <span className="text-muted"> published this week</span>
+          </span>
+          <span className="text-sm">
+            <span className="font-bold">{activity.published_total}</span>
+            <span className="text-muted"> published in total</span>
+          </span>
+          <span className="text-[11px] text-muted ml-auto">
+            counts posts published here or marked Posted it
+          </span>
+        </div>
+      )}
+
+      {/* Idea Spark */}
+      <div className="glass-card p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-amber-500" />
+            Idea Spark
+            <span className="text-xs font-normal text-muted">fresh post ideas for today</span>
+          </h2>
+          <button
+            onClick={() => fetchIdeas(true)}
+            disabled={ideasLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-card-border px-2.5 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:border-amber-500/30 transition-colors disabled:opacity-50"
+            title="Generate new ideas"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${ideasLoading ? "animate-spin" : ""}`} />
+            New ideas
+          </button>
+        </div>
+        {ideasLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-card-border p-4 animate-pulse">
+                <div className="h-4 w-3/4 bg-stone-200 dark:bg-stone-700 rounded mb-2" />
+                <div className="h-3 w-full bg-stone-200 dark:bg-stone-700 rounded mb-1" />
+                <div className="h-3 w-2/3 bg-stone-200 dark:bg-stone-700 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : ideasError ? (
+          <p className="text-sm text-muted">
+            The idea generator is warming up or unavailable right now.{" "}
+            <button onClick={() => fetchIdeas()} className="text-amber-600 hover:text-amber-500 font-medium">
+              Try again
+            </button>
+          </p>
+        ) : ideas.length === 0 ? (
+          <p className="text-sm text-muted">No ideas yet. Click New ideas to generate some.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {ideas.map((idea, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-card-border p-4 flex flex-col hover:border-amber-500/30 transition-colors"
+              >
+                <span className="inline-flex self-start rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 mb-2">
+                  {idea.format.replace(/_/g, " ")}
+                </span>
+                <p className="text-sm font-semibold leading-snug">{idea.title}</p>
+                <p className="text-xs text-muted mt-1 mb-3 leading-relaxed">{idea.description}</p>
+                <Link
+                  href={`/dashboard/posts?action=generate&topic=${encodeURIComponent(idea.topic)}`}
+                  className="mt-auto inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-500"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Write this
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bottom grid: Recent Posts + Upcoming Scheduled */}

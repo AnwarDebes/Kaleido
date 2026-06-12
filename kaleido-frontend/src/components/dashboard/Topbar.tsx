@@ -11,6 +11,8 @@ import { cn } from "@/lib/cn";
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/dashboard/posts": "Posts",
+  "/dashboard/repurpose": "Repurpose Studio",
+  "/dashboard/planner": "Week Planner",
   "/dashboard/schedule": "Schedule",
   "/dashboard/media": "Media",
   "/dashboard/campaigns": "Campaigns",
@@ -19,6 +21,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/blog": "Blog",
   "/dashboard/newsletters": "Newsletters",
   "/dashboard/brands": "Brands",
+  "/dashboard/connections": "Connections",
   "/dashboard/settings": "Settings",
 };
 
@@ -69,8 +72,11 @@ export default function Topbar() {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-glass-border bg-glass-bg/50 px-6 backdrop-blur-md">
       {/* Page title - offset on mobile to avoid hamburger overlap */}
-      <div className="pl-12 lg:pl-0">
+      <div className="pl-12 lg:pl-0 flex items-center gap-3">
         <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
+        <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+          Beta
+        </span>
       </div>
 
       {/* Right section */}

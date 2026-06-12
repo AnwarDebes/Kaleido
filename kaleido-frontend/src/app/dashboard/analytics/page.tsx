@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Share2,
   Filter,
+  Flame,
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
@@ -32,6 +33,19 @@ interface OverviewData {
   comments?: number;
   shares?: number;
   views?: number;
+}
+
+interface ActivityData {
+  streak_days: number;
+  published_this_week: number;
+  published_total: number;
+  self_reported: {
+    entries: number;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+  };
 }
 
 interface GrowthDataPoint {
@@ -93,6 +107,24 @@ export default function AnalyticsPage() {
   const [growth, setGrowth] = useState<GrowthDataPoint[]>([]);
   const [bestTimes, setBestTimes] = useState<BestTime[]>([]);
   const [topPosts, setTopPosts] = useState<PostAnalytic[]>([]);
+  const [activity, setActivity] = useState<ActivityData | null>(null);
+
+  // Activity is not affected by the date range or platform filters,
+  // so it loads once on mount. On error the section stays hidden.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get("/analytics/activity")
+      .then((res) => {
+        if (!cancelled) setActivity(res.data.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setActivity(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const computeDates = useCallback(() => {
     const end = new Date();
@@ -360,6 +392,122 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Activity & self-reported results */}
+      {activity && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Flame className="h-4 w-4 text-amber-500" />
+            <h3 className="text-sm font-semibold">
+              Activity & self-reported results
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0 }}
+              className="glass-card p-4"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted">Posting streak</span>
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Flame className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">
+                {activity.streak_days}{" "}
+                <span className="text-sm font-medium text-muted">
+                  {activity.streak_days === 1 ? "day" : "days"}
+                </span>
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="glass-card p-4"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted">Published this week</span>
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Calendar className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">
+                {formatNumber(activity.published_this_week)}
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="glass-card p-4"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted">Published total</span>
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">
+                {formatNumber(activity.published_total)}
+              </p>
+            </motion.div>
+
+            {activity.self_reported.entries > 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="glass-card p-4"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted">Self-reported reach</span>
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Eye className="h-4 w-4 text-amber-500" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3 text-muted" />
+                    {formatNumber(activity.self_reported.views)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ThumbsUp className="h-3 w-3 text-muted" />
+                    {formatNumber(activity.self_reported.likes)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3 text-muted" />
+                    {formatNumber(activity.self_reported.comments)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Share2 className="h-3 w-3 text-muted" />
+                    {formatNumber(activity.self_reported.shares)}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted mt-2">
+                  Entered by you on the Posts page, not platform data.
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="glass-card p-4 flex items-center"
+              >
+                <p className="text-xs text-muted">
+                  After you share a post manually, use Log results on the Posts
+                  page to track how it did. Numbers you enter show up here.
+                </p>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
@@ -414,7 +562,9 @@ export default function AnalyticsPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">No analytics data yet</h3>
           <p className="text-sm text-muted max-w-sm mx-auto">
-            No analytics data yet. Start posting to see your performance!
+            Platform metrics only exist for posts published through a connected
+            account. Posts you download and share manually will not report
+            numbers here, but they still reach your audience just the same.
           </p>
         </motion.div>
       ) : (

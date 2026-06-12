@@ -15,9 +15,11 @@ import {
   Eye,
   Save,
   ArrowLeft,
+  Download,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
+import { downloadText, safeFilename } from "@/lib/download";
 
 interface BlogPost {
   id: string;
@@ -194,6 +196,21 @@ export default function BlogPage() {
     return text.slice(0, len).trimEnd() + "...";
   }
 
+  function downloadAsMarkdown(post: BlogPost) {
+    const front = [
+      "---",
+      `title: ${JSON.stringify(post.title)}`,
+      post.slug ? `slug: ${post.slug}` : null,
+      post.status ? `status: ${post.status}` : null,
+      post.tags && post.tags.length ? `tags: [${post.tags.map((t) => JSON.stringify(t)).join(", ")}]` : null,
+      `created_at: ${post.created_at}`,
+      "---",
+      "",
+    ].filter(Boolean).join("\n");
+    const filename = safeFilename(post.title || "blog-post");
+    downloadText(`${filename}.md`, `${front}\n${post.content_markdown}\n`, "text/markdown");
+  }
+
   function getWordCount(text: string) {
     return text.trim().split(/\s+/).filter(Boolean).length;
   }
@@ -325,6 +342,14 @@ export default function BlogPage() {
                     >
                       <Edit3 className="h-3.5 w-3.5" />
                       Edit
+                    </button>
+                    <button
+                      onClick={() => downloadAsMarkdown(post)}
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-amber-500/10 transition-colors"
+                      title="Download as .md"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
                     </button>
                     <button
                       onClick={() => deletePost(post.id)}
