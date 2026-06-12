@@ -113,7 +113,16 @@ SUPPORTED_PLATFORMS = [
 
 @router.get("/platforms")
 async def list_supported_platforms():
-    return {"success": True, "data": SUPPORTED_PLATFORMS}
+    # "configured" tells the frontend whether the server has working
+    # credentials for the platform, so badges can be honest about which
+    # Connect buttons can actually do something today.
+    return {
+        "success": True,
+        "data": [
+            {**p, "configured": _get_platform_client(p["id"]) is not None}
+            for p in SUPPORTED_PLATFORMS
+        ],
+    }
 
 
 @router.get("")

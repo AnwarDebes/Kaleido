@@ -21,7 +21,7 @@ class BlueskyPlatform(BasePlatform):
 
     def get_auth_url(self, redirect_uri: str, state: str) -> str:
         # Bluesky uses app passwords, not OAuth
-        # Return a placeholder — frontend handles credential input
+        # Return a placeholder; frontend handles credential input
         return f"{redirect_uri}?state={state}&platform=bluesky"
 
     async def exchange_code(self, code: str, redirect_uri: str) -> OAuthTokens:

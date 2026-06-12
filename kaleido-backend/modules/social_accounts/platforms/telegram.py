@@ -7,7 +7,7 @@ logger = structlog.get_logger()
 
 
 class TelegramPlatform(BasePlatform):
-    """Telegram uses Bot API for channel/group posting. No OAuth flow — uses bot token + chat_id."""
+    """Telegram uses Bot API for channel/group posting. No OAuth flow; uses bot token + chat_id."""
 
     platform_name = "telegram"
 
@@ -15,7 +15,7 @@ class TelegramPlatform(BasePlatform):
         pass
 
     def get_auth_url(self, redirect_uri: str, state: str) -> str:
-        # Telegram bot setup is done via BotFather — frontend handles bot token input
+        # Telegram bot setup is done via BotFather; frontend handles bot token input
         return f"{redirect_uri}?state={state}&platform=telegram"
 
     async def exchange_code(self, code: str, redirect_uri: str) -> OAuthTokens:
