@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 
 class AuthService:
     @staticmethod
-    async def register(db: AsyncSession, data: RegisterRequest) -> User:
+    async def register(db: AsyncSession, data: RegisterRequest) -> dict:
         # Check if email already exists
         result = await db.execute(select(User).where(User.email == data.email))
         if result.scalar_one_or_none():
@@ -46,8 +46,36 @@ class AuthService:
         await db.commit()
         await db.refresh(user)
 
+        # Link the referrer if a referral code was supplied. A bad code
+        # should never block the signup itself.
+        if data.referral_code:
+            try:
+                from modules.referral.service import ReferralService
+
+                await ReferralService.apply_referral(db, user.id, data.referral_code)
+            except Exception as e:
+                logger.warning(
+                    "referral_apply_failed", user_id=str(user.id), error=str(e)
+                )
+
         logger.info("user_registered", user_id=str(user.id), email=user.email)
-        return user
+
+        # Issue tokens right away so new users land in the dashboard
+        # without a second login step.
+        access_token = create_access_token(str(user.id))
+        refresh_token = create_refresh_token(str(user.id))
+        await redis_client.setex(
+            f"refresh_token:{str(user.id)}",
+            60 * 60 * 24 * 7,  # 7 days
+            refresh_token,
+        )
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": user,
+        }
 
     @staticmethod
     async def login(db: AsyncSession, data: LoginRequest) -> dict:

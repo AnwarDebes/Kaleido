@@ -1,3 +1,5 @@
+import uuid
+
 import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,11 +27,14 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register")
 async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    user = await AuthService.register(db, data)
+    result = await AuthService.register(db, data)
     return {
         "success": True,
         "data": {
-            "user": UserResponse.model_validate(user).model_dump(),
+            "access_token": result["access_token"],
+            "refresh_token": result["refresh_token"],
+            "token_type": result["token_type"],
+            "user": UserResponse.model_validate(result["user"]).model_dump(),
             "message": "Registration successful",
         },
     }
@@ -126,3 +131,99 @@ async def change_password(
         "success": True,
         "data": {"message": "Password changed successfully"},
     }
+
+
+@router.get("/me/export")
+async def export_my_data(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download everything the user has created as one ZIP. Their data is
+    theirs; a free product should never hold it hostage."""
+    import io
+    import json
+    import os
+    import zipfile
+    from datetime import datetime, timezone
+
+    from fastapi import Response
+    from sqlalchemy import select
+
+    from modules.brands.models import Brand
+    from modules.content.models import ManualStat, MediaFile, Post
+
+    def dump(rows, fields):
+        out = []
+        for r in rows:
+            item = {}
+            for f in fields:
+                v = getattr(r, f, None)
+                if hasattr(v, "isoformat"):
+                    v = v.isoformat()
+                elif isinstance(v, uuid.UUID):
+                    v = str(v)
+                elif isinstance(v, list):
+                    v = [str(x) for x in v]
+                item[f] = v
+            out.append(item)
+        return json.dumps(out, indent=2, ensure_ascii=False, default=str)
+
+    posts = (
+        (await db.execute(select(Post).where(Post.user_id == user.id, Post.deleted_at.is_(None))))
+        .scalars()
+        .all()
+    )
+    brands = (await db.execute(select(Brand).where(Brand.user_id == user.id))).scalars().all()
+    media = (await db.execute(select(MediaFile).where(MediaFile.user_id == user.id))).scalars().all()
+    stats = (await db.execute(select(ManualStat).where(ManualStat.user_id == user.id))).scalars().all()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "README.txt",
+            "Your Kaleido data export, created "
+            + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            + ".\n\nposts.json: all your posts with per-platform content.\n"
+            "brands.json: your brand profiles.\nmedia.json: your media library index.\n"
+            "stats.json: your self-reported results.\nmedia/: your media files.\n",
+        )
+        zf.writestr(
+            "posts.json",
+            dump(
+                posts,
+                [
+                    "id", "content_text", "platform_contents", "content_type", "hashtags",
+                    "alt_text", "status", "scheduled_at", "published_at", "ai_generated",
+                    "ai_prompt", "created_at",
+                ],
+            ),
+        )
+        zf.writestr(
+            "brands.json",
+            dump(brands, ["id", "name", "industry", "brand_voice", "content_pillars", "target_audience", "created_at"]),
+        )
+        zf.writestr(
+            "media.json",
+            dump(media, ["id", "filename", "file_type", "mime_type", "ai_generated", "ai_prompt", "created_at"]),
+        )
+        zf.writestr(
+            "stats.json",
+            dump(stats, ["post_id", "platform", "views", "likes", "comments", "shares", "noted_at"]),
+        )
+        total = 0
+        for m in media:
+            if m.file_path and os.path.isfile(m.file_path):
+                size = os.path.getsize(m.file_path)
+                if total + size > 500 * 1024 * 1024:
+                    zf.writestr("media/TRUNCATED.txt", "Media over 500 MB total was left out of this export.")
+                    break
+                total += size
+                ext = os.path.splitext(m.file_path)[1]
+                zf.write(m.file_path, f"media/{m.id}{ext}")
+
+    logger.info("data_exported", user_id=str(user.id), posts=len(posts), media=len(media))
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="kaleido-export.zip"'},
+    )

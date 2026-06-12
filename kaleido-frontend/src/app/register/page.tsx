@@ -33,26 +33,26 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      await api.post("/auth/register", {
+      const res = await api.post("/auth/register", {
         full_name: fullName,
         email,
         password,
+        referral_code: refCode || null,
       });
 
-      // If referral code, apply it after registration
-      if (refCode) {
-        try {
-          const loginRes = await api.post("/auth/login", { email, password });
-          const token = loginRes.data.data.access_token;
-          localStorage.setItem("kaleido_token", token);
-          router.push("/dashboard");
-          return;
-        } catch {
-          // If auto-login fails, redirect to login page
+      // Registration returns tokens, so new users land straight in the
+      // dashboard with no second login step.
+      const { access_token, refresh_token } = res.data.data;
+      if (access_token) {
+        localStorage.setItem("kaleido_token", access_token);
+        if (refresh_token) {
+          localStorage.setItem("kaleido_refresh_token", refresh_token);
         }
+        router.push("/dashboard");
+        return;
       }
 
-      router.push("/login?registered=true");
+      router.push("/login");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
       setError(
@@ -88,9 +88,9 @@ function RegisterForm() {
         <div className="glass-card p-8">
           <KaleidoLogo className="mb-8" />
 
-          <h1 className="text-2xl font-bold mb-1">Create your account</h1>
+          <h1 className="text-2xl font-bold mb-1">Create your free account</h1>
           <p className="text-sm text-muted mb-6">
-            Start managing your social media with AI
+            Kaleido is free for everyone. No credit card needed.
           </p>
 
           {refCode && (

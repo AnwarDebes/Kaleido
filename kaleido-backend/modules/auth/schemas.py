@@ -8,6 +8,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=1, max_length=255)
+    referral_code: str | None = Field(default=None, max_length=20)
 
 
 class LoginRequest(BaseModel):
@@ -52,7 +53,6 @@ class UserResponse(BaseModel):
     locale: str
     timezone: str
     is_email_verified: bool
-    plan: str
     onboarding_completed: bool
     referral_code: str | None
     created_at: datetime

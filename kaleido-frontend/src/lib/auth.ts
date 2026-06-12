@@ -5,7 +5,12 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  referral_code: string;
+  avatar_url: string | null;
+  locale: string;
+  timezone: string;
+  is_email_verified: boolean;
+  onboarding_completed: boolean;
+  referral_code: string | null;
   created_at: string;
 }
 
@@ -38,11 +43,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (fullName: string, email: string, password: string) => {
-    await api.post("/auth/register", {
+    const response = await api.post("/auth/register", {
       full_name: fullName,
       email,
       password,
     });
+    const { access_token, refresh_token, user } = response.data.data;
+    if (access_token) {
+      localStorage.setItem("kaleido_token", access_token);
+      if (refresh_token) localStorage.setItem("kaleido_refresh_token", refresh_token);
+      set({ token: access_token, user, isAuthenticated: true });
+    }
     return { success: true };
   },
 
