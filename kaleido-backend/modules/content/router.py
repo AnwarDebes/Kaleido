@@ -123,6 +123,33 @@ class ManualStatsRequest(_BaseModel):
     shares: int = _Field(default=0, ge=0)
 
 
+async def _attach_media(db: AsyncSession, user_id: uuid.UUID, dumps: list[dict]) -> list[dict]:
+    """Add a resolvable "media" array to dumped posts so the UI can show a
+    post and its image together (thumbnails, previews, share downloads)."""
+    ids: set = set()
+    for d in dumps:
+        for m in d.get("media_ids") or []:
+            ids.add(m)
+    lookup = {}
+    if ids:
+        result = await db.execute(
+            select(MediaFile).where(MediaFile.id.in_(ids), MediaFile.user_id == user_id)
+        )
+        for m in result.scalars().all():
+            lookup[m.id] = {
+                "id": str(m.id),
+                "file_url": m.file_url,
+                "file_type": m.file_type,
+                "thumbnail_url": m.thumbnail_url,
+                "filename": m.filename,
+                "width": m.width,
+                "height": m.height,
+            }
+    for d in dumps:
+        d["media"] = [lookup[m] for m in (d.get("media_ids") or []) if m in lookup]
+    return dumps
+
+
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
 
@@ -137,9 +164,10 @@ async def list_posts(
 ):
     offset = (page - 1) * per_page
     posts, total = await PostService.list_posts(db, user.id, status=status, brand_id=brand_id, limit=per_page, offset=offset)
+    dumps = await _attach_media(db, user.id, [PostResponse.model_validate(p).model_dump() for p in posts])
     return {
         "success": True,
-        "data": [PostResponse.model_validate(p).model_dump() for p in posts],
+        "data": dumps,
         "meta": {
             "page": page,
             "per_page": per_page,
@@ -156,9 +184,10 @@ async def create_post(
     db: AsyncSession = Depends(get_db),
 ):
     post = await PostService.create_post(db, user.id, data)
+    dumps = await _attach_media(db, user.id, [PostResponse.model_validate(post).model_dump()])
     return {
         "success": True,
-        "data": PostResponse.model_validate(post).model_dump(),
+        "data": dumps[0],
     }
 
 
@@ -592,9 +621,10 @@ async def get_post(
     db: AsyncSession = Depends(get_db),
 ):
     post = await PostService.get_post(db, post_id, user.id)
+    dumps = await _attach_media(db, user.id, [PostResponse.model_validate(post).model_dump()])
     return {
         "success": True,
-        "data": PostResponse.model_validate(post).model_dump(),
+        "data": dumps[0],
     }
 
 
@@ -606,9 +636,10 @@ async def update_post(
     db: AsyncSession = Depends(get_db),
 ):
     post = await PostService.update_post(db, post_id, user.id, data)
+    dumps = await _attach_media(db, user.id, [PostResponse.model_validate(post).model_dump()])
     return {
         "success": True,
-        "data": PostResponse.model_validate(post).model_dump(),
+        "data": dumps[0],
     }
 
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class PostCreate(BaseModel):
     brand_id: uuid.UUID | None = None
     content_text: str | None = None
+    media_ids: list[uuid.UUID] = Field(default_factory=list)
     platform_contents: dict = Field(default_factory=dict)
     content_type: str = "post"
     hashtags: list[str] = Field(default_factory=list)
@@ -19,6 +20,7 @@ class PostCreate(BaseModel):
 
 class PostUpdate(BaseModel):
     content_text: str | None = None
+    media_ids: list[uuid.UUID] | None = None
     platform_contents: dict | None = None
     hashtags: list[str] | None = None
     link_url: str | None = None
@@ -33,6 +35,7 @@ class PostResponse(BaseModel):
     user_id: uuid.UUID
     brand_id: uuid.UUID | None
     campaign_id: uuid.UUID | None
+    media_ids: list[uuid.UUID] | None = None
     content_text: str | None
     platform_contents: dict
     content_type: str
