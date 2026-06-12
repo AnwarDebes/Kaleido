@@ -6,7 +6,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.ollama_client import ollama_client
+from ai.ollama_client import DEFAULT_MODEL, ollama_client
 from core.exceptions import NotFoundError
 from modules.blog.models import BlogPost
 from modules.blog.schemas import BlogPostCreate, BlogPostUpdate
@@ -167,7 +167,7 @@ Write the full blog post in Markdown format."""
             result = await ollama_client.generate_text(
                 prompt=prompt,
                 system="You are an expert content writer who creates engaging, SEO-optimized blog posts.",
-                model="gemma3:12b-it-q4_K_M",
+                model=DEFAULT_MODEL,
             )
             content = result if isinstance(result, str) else str(result)
         except Exception as e:
@@ -203,7 +203,7 @@ Write the full blog post in Markdown format."""
             reading_time_minutes=max(1, len(content.split()) // 200),
             ai_generated=True,
             ai_prompt=topic,
-            ai_model="gemma3:12b-it-q4_K_M" if "fallback" not in content else "fallback",
+            ai_model=DEFAULT_MODEL if "fallback" not in content else "fallback",
         )
         db.add(post)
         await db.commit()
@@ -223,6 +223,6 @@ Write the full blog post in Markdown format."""
             f"\n## Key Benefits\n\nEmbracing {topic} offers numerous advantages:\n\n1. **Increased Efficiency**: Streamline processes and optimize workflows\n2. **Better Outcomes**: Achieve measurable results through structured approaches\n3. **Competitive Advantage**: Stay ahead by leveraging best practices\n4. **Scalability**: Build systems that grow with your needs",
             f"\n## Best Practices\n\nTo maximize the potential of {topic}, consider these proven strategies:\n\n- Start with clear objectives and measurable goals\n- Invest in the right tools and technologies\n- Foster a culture of continuous learning\n- Measure results and iterate based on data\n- Collaborate across teams for comprehensive solutions",
             f"\n## Implementation Strategy\n\nSuccessful implementation of {topic} requires a phased approach:\n\n### Phase 1: Assessment\nEvaluate your current state and identify gaps.\n\n### Phase 2: Planning\nDevelop a detailed roadmap with milestones.\n\n### Phase 3: Execution\nImplement changes incrementally, validating at each step.\n\n### Phase 4: Optimization\nContinuously refine based on results and feedback.",
-            f"\n## Conclusion\n\n{topic} is not just a trend — it's a fundamental shift in how we approach challenges and opportunities. By following the strategies outlined in this guide, you can position yourself and your organization for long-term success.\n\nThe key is to start small, measure results, and scale what works. The journey of mastering {topic} begins with a single step.",
+            f"\n## Conclusion\n\n{topic} is not just a trend. It's a fundamental shift in how we approach challenges and opportunities. By following the strategies outlined in this guide, you can position yourself and your organization for long-term success.\n\nThe key is to start small, measure results, and scale what works. The journey of mastering {topic} begins with a single step.",
         ]
         return "\n".join(sections)

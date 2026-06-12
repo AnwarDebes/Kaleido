@@ -1,5 +1,5 @@
 """
-GPU Model Manager — manages SDXL-Lightning and Wan2.1 models.
+GPU Model Manager for the SDXL-Lightning and Wan2.1 models.
 Handles loading/unloading to share V100 32GB with Ollama.
 """
 
@@ -11,7 +11,12 @@ import time
 import uuid
 
 import structlog
-import torch
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
 from PIL import Image
 
 from config.settings import settings
@@ -32,7 +37,7 @@ def _free_gpu():
     _video_pipe = None
     _current_model = None
     gc.collect()
-    if torch.cuda.is_available():
+    if torch is not None and torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
     logger.info("gpu_memory_freed")
@@ -131,6 +136,9 @@ async def generate_image(
     seed: int | None = None,
 ) -> dict:
     """Generate an image using SDXL-Lightning on local GPU."""
+    if torch is None or not torch.cuda.is_available():
+        raise RuntimeError("Image generation is temporarily unavailable on this server")
+
     width, height = ASPECT_RATIOS.get(aspect_ratio, (1024, 1024))
     style_suffix = STYLE_PROMPTS.get(style, "")
     enhanced_prompt = prompt + style_suffix
@@ -205,6 +213,9 @@ async def generate_video(
     fps: int = 16,
 ) -> dict:
     """Generate a video using Wan2.1-T2V-1.3B on local GPU."""
+    if torch is None or not torch.cuda.is_available():
+        raise RuntimeError("Video generation is temporarily unavailable on this server")
+
     # Enhance prompt for better quality
     enhanced_prompt = (
         prompt.rstrip(". ")

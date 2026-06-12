@@ -9,6 +9,19 @@ from config.settings import settings
 logger = structlog.get_logger()
 
 
+def _strip_dashes(text: str) -> str:
+    """Kaleido convention: no em or en dashes anywhere, including AI output
+    that ends up in users' posts."""
+    return (
+        text.replace(" \u2014 ", ", ")
+        .replace("\u2014", ", ")
+        .replace("\u2013", "-")
+    )
+
+
+DEFAULT_MODEL = settings.ollama_model
+
+
 class OllamaClient:
     def __init__(self, base_url: str | None = None):
         self.base_url = base_url or settings.ollama_base_url
@@ -17,17 +30,20 @@ class OllamaClient:
         self,
         prompt: str,
         system: str = "",
-        model: str = "gemma3:12b-it-q4_K_M",
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        images: list[str] | None = None,
     ) -> str:
-        async with httpx.AsyncClient(timeout=300) as client:
+        async with httpx.AsyncClient(timeout=600) as client:
             resp = await client.post(
                 f"{self.base_url}/api/generate",
                 json={
-                    "model": model,
+                    "model": model or DEFAULT_MODEL,
+                    "keep_alive": "1h",
                     "prompt": prompt,
                     "system": system,
+                    **({"images": images} if images else {}),
                     "stream": False,
                     "options": {
                         "temperature": temperature,
@@ -43,20 +59,21 @@ class OllamaClient:
                 eval_count=data.get("eval_count"),
                 eval_duration_ms=round(data.get("eval_duration", 0) / 1_000_000, 2),
             )
-            return data["response"]
+            return _strip_dashes(data["response"])
 
     async def generate_chat(
         self,
         messages: list[dict],
-        model: str = "gemma3:12b-it-q4_K_M",
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
-        async with httpx.AsyncClient(timeout=300) as client:
+        async with httpx.AsyncClient(timeout=600) as client:
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
-                    "model": model,
+                    "model": model or DEFAULT_MODEL,
+                    "keep_alive": "1h",
                     "messages": messages,
                     "stream": False,
                     "options": {
@@ -67,14 +84,15 @@ class OllamaClient:
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["message"]["content"]
+            return _strip_dashes(data["message"]["content"])
 
     async def generate_structured(
         self,
         prompt: str,
         system: str = "",
-        model: str = "gemma3:12b-it-q4_K_M",
+        model: str | None = None,
         temperature: float = 0.3,
+        images: list[str] | None = None,
     ) -> dict:
         """Generate a JSON response from the model."""
         json_system = system + "\n\nYou MUST respond with valid JSON only. No markdown, no explanations."
@@ -83,6 +101,7 @@ class OllamaClient:
             system=json_system,
             model=model,
             temperature=temperature,
+            images=images,
         )
         # Try to extract JSON from the response
         response = response.strip()
@@ -96,16 +115,17 @@ class OllamaClient:
     async def stream_chat(
         self,
         messages: list[dict],
-        model: str = "gemma3:12b-it-q4_K_M",
+        model: str | None = None,
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
         """Stream chat response tokens."""
-        async with httpx.AsyncClient(timeout=300) as client:
+        async with httpx.AsyncClient(timeout=600) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
                 json={
-                    "model": model,
+                    "model": model or DEFAULT_MODEL,
+                    "keep_alive": "1h",
                     "messages": messages,
                     "stream": True,
                     "options": {"temperature": temperature},

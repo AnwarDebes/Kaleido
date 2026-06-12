@@ -24,6 +24,7 @@ from modules.blog.router import router as blog_router
 from modules.newsletter.router import router as newsletter_router
 from modules.chat.router import router as chat_router
 from modules.integrations.router import router as integrations_router
+from modules.notifications.router import router as notifications_router
 from modules.referral.router import router as referral_router
 
 structlog.configure(
@@ -47,7 +48,50 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("kaleido_starting", version="0.1.0")
+
+    # Fail loudly (but keep serving /health) if core services are missing,
+    # instead of surfacing as confusing 500s on first request.
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("database_connected")
+    except Exception as e:
+        logger.error("database_unreachable", error=str(e))
+
+    try:
+        await redis_client.ping()
+        logger.info("redis_connected")
+    except Exception as e:
+        logger.error("redis_unreachable", error=str(e))
+
+    # Warm the text model in the background so the first generation of the
+    # day is fast instead of waiting minutes for the model to load from disk.
+    async def _warm_ollama():
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=900) as client:
+                await client.post(
+                    f"{settings.ollama_base_url}/api/generate",
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": "OK",
+                        "stream": False,
+                        "keep_alive": "1h",
+                        "options": {"num_predict": 1},
+                    },
+                )
+            logger.info("ollama_model_warmed", model=settings.ollama_model)
+        except Exception as e:
+            logger.warning("ollama_warmup_failed", error=str(e))
+
+    import asyncio
+
+    warmup_task = asyncio.create_task(_warm_ollama())
+
     yield
+
+    warmup_task.cancel()
     await engine.dispose()
     await redis_client.close()
     logger.info("kaleido_shutdown")
@@ -69,7 +113,7 @@ app.add_middleware(
         "https://skill-bridge-git-main-anwardebes-projects.vercel.app",
         "http://localhost:3000",
     ],
-    allow_origin_regex=r"https://skill-bridge.*\.vercel\.app",
+    allow_origin_regex=r"https://(skill-bridge|kaleido).*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -108,6 +152,7 @@ app.include_router(blog_router, prefix="/v1")
 app.include_router(newsletter_router, prefix="/v1")
 app.include_router(chat_router, prefix="/v1")
 app.include_router(integrations_router, prefix="/v1")
+app.include_router(notifications_router, prefix="/v1")
 app.include_router(referral_router, prefix="/v1")
 
 # --- Static media files ---

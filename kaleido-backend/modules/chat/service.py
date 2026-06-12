@@ -5,7 +5,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.ollama_client import ollama_client
+from ai.ollama_client import DEFAULT_MODEL, ollama_client
 from core.exceptions import NotFoundError
 from modules.chat.models import ChatConversation, ChatMessage
 
@@ -118,7 +118,7 @@ class ChatService:
         try:
             response = await ollama_client.generate_chat(
                 messages=chat_history,
-                model="gemma3:12b-it-q4_K_M",
+                model=DEFAULT_MODEL,
             )
             ai_content = response if isinstance(response, str) else str(response)
         except Exception as e:
@@ -249,11 +249,11 @@ Would you like me to dive deeper into any of these areas?"""
             return f"""Great question! Here are my thoughts on "{user_message[:50]}":
 
 **Key Considerations:**
-1. **Audience First** — Always start by understanding who you're trying to reach
-2. **Consistency** — Maintain a regular posting schedule
-3. **Quality Over Quantity** — One great post beats five mediocre ones
-4. **Engagement** — Respond to comments and engage with your community
-5. **Analytics** — Let data guide your decisions
+1. **Audience First**: Always start by understanding who you're trying to reach
+2. **Consistency**: Maintain a regular posting schedule
+3. **Quality Over Quantity**: One great post beats five mediocre ones
+4. **Engagement**: Respond to comments and engage with your community
+5. **Analytics**: Let data guide your decisions
 
 **Recommended Next Steps:**
 - Review your recent post performance

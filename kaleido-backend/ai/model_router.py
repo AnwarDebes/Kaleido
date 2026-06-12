@@ -2,7 +2,7 @@ import structlog
 
 from ai.comfyui_client import comfyui_client
 from ai.gpu_manager import GPUMode, gpu_manager
-from ai.ollama_client import ollama_client
+from ai.ollama_client import DEFAULT_MODEL, ollama_client
 
 logger = structlog.get_logger()
 
@@ -20,10 +20,10 @@ class ModelRouter:
     ) -> str:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
 
         return await ollama_client.generate_text(
             prompt=prompt,
@@ -42,10 +42,10 @@ class ModelRouter:
     ) -> dict:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
 
         return await ollama_client.generate_structured(
             prompt=prompt,
@@ -92,10 +92,10 @@ class ModelRouter:
     ) -> str:
         if use_fast_model:
             await gpu_manager.ensure_mode(GPUMode.DUAL_LIGHT)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
         else:
             await gpu_manager.ensure_mode(GPUMode.TEXT_HEAVY)
-            model = "gemma3:12b-it-q4_K_M"
+            model = DEFAULT_MODEL
 
         return await ollama_client.generate_chat(
             messages=messages,

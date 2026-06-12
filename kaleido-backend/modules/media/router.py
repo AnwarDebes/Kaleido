@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.database import get_db, async_session
 from config.settings import settings
+from core.exceptions import KaleidoException
 from core.security import get_current_user
 from modules.auth.models import User
 from modules.media.image_generator import ImageGenerator
@@ -90,13 +91,23 @@ async def generate_image(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    file_info = await ImageGenerator.generate_image(
-        prompt=data.prompt,
-        aspect_ratio=data.aspect_ratio,
-        style=data.style,
-        steps=data.steps,
-        seed=data.seed,
-    )
+    try:
+        file_info = await ImageGenerator.generate_image(
+            prompt=data.prompt,
+            aspect_ratio=data.aspect_ratio,
+            style=data.style,
+            steps=data.steps,
+            seed=data.seed,
+        )
+    except KaleidoException:
+        raise
+    except Exception as e:
+        logger.error("image_generation_failed", error=str(e))
+        raise KaleidoException(
+            status_code=503,
+            code="GENERATION_UNAVAILABLE",
+            message="Image generation is temporarily unavailable. Please try again shortly.",
+        )
     media = await MediaService.save_generated_media(
         db, user.id, file_info, folder=data.folder, tags=data.tags
     )

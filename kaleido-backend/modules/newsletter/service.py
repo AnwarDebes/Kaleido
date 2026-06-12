@@ -149,7 +149,7 @@ class NewsletterService:
         )
         subscribers = result.scalars().all()
 
-        # TODO: actual SMTP sending — for now, mark as sent
+        # TODO: actual SMTP sending; for now, mark as sent
         nl.status = "sent"
         nl.sent_at = datetime.now(timezone.utc)
         nl.recipients_count = len(subscribers)
@@ -186,7 +186,7 @@ Write the full newsletter in Markdown format."""
             )
             content = result if isinstance(result, str) else str(result)
         except Exception:
-            content = f"""# {topic} — Your Weekly Update
+            content = f"""# {topic}: Your Weekly Update
 
 ## Hello!
 

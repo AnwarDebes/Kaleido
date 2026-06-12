@@ -5,7 +5,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.ollama_client import ollama_client
+from ai.ollama_client import DEFAULT_MODEL, ollama_client
 from core.exceptions import NotFoundError
 from modules.campaigns.models import Campaign
 from modules.campaigns.schemas import CampaignCreate, CampaignUpdate
@@ -152,7 +152,7 @@ Return ONLY valid JSON."""
             result = await ollama_client.generate_structured(
                 prompt=prompt,
                 schema={"type": "object"},
-                model="gemma3:12b-it-q4_K_M",
+                model=DEFAULT_MODEL,
             )
             content_plan = result if isinstance(result, dict) else {"raw_plan": str(result)}
         except Exception as e:
