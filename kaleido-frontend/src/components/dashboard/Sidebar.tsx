@@ -23,6 +23,7 @@ import {
   Share2,
   Wand2,
   CalendarCheck,
+  PenSquare,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import KaleidoLogo, { KaleidoIcon } from "@/components/KaleidoLogo";
@@ -35,18 +36,19 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Studio", href: "/dashboard/studio", icon: PenSquare },
   { label: "Posts", href: "/dashboard/posts", icon: FileText },
-  { label: "Repurpose", href: "/dashboard/repurpose", icon: Wand2 },
-  { label: "Planner", href: "/dashboard/planner", icon: CalendarCheck },
-  { label: "Schedule", href: "/dashboard/schedule", icon: Calendar },
   { label: "Media", href: "/dashboard/media", icon: Image },
-  { label: "Campaigns", href: "/dashboard/campaigns", icon: Target },
-  { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { label: "Schedule", href: "/dashboard/schedule", icon: Calendar },
+  { label: "Planner", href: "/dashboard/planner", icon: CalendarCheck },
+  { label: "Repurpose", href: "/dashboard/repurpose", icon: Wand2 },
   { label: "AI Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { label: "Blog", href: "/dashboard/blog", icon: BookOpen },
-  { label: "Newsletters", href: "/dashboard/newsletters", icon: Mail },
   { label: "Brands", href: "/dashboard/brands", icon: Building2 },
   { label: "Connections", href: "/dashboard/connections", icon: Share2 },
+  { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { label: "Campaigns", href: "/dashboard/campaigns", icon: Target },
+  { label: "Blog", href: "/dashboard/blog", icon: BookOpen },
+  { label: "Newsletters", href: "/dashboard/newsletters", icon: Mail },
 ];
 
 const bottomNavItems: NavItem[] = [

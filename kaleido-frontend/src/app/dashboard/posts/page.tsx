@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Loader2,
   Image as ImageIcon,
+  Film,
   Share2,
   Download,
   Package,
@@ -54,6 +55,14 @@ interface Post {
   scheduled_at?: string;
   created_at: string;
   updated_at: string;
+  media_ids?: string[];
+  media?: {
+    id: string;
+    file_url: string | null;
+    file_type: string;
+    thumbnail_url: string | null;
+    filename: string;
+  }[];
 }
 
 interface PostsResponse {
@@ -67,6 +76,8 @@ interface PostsResponse {
 }
 
 /* ---------- constants ---------- */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 const STATUSES = ["all", "draft", "scheduled", "published", "failed"] as const;
 type StatusFilter = (typeof STATUSES)[number];
@@ -230,13 +241,6 @@ export default function PostsPage() {
     setEditingPost(null);
     setEditorText("");
     setEditorPlatforms([]);
-    setShowEditor(true);
-  }
-
-  function openEditPost(post: Post) {
-    setEditingPost(post);
-    setEditorText(post.content_text || "");
-    setEditorPlatforms(Object.keys(post.platform_contents || {}));
     setShowEditor(true);
   }
 
@@ -510,6 +514,11 @@ export default function PostsPage() {
       subtitle: post.ai_generated ? "AI generated · pick a destination" : "Pick a destination",
       text: firstPlatformContent,
       hashtags: post.hashtags ?? Object.values(post.platform_contents || {}).flatMap((c) => c?.hashtags || []),
+      media: (post.media || []).map((m) => ({
+        url: API_URL + (m.file_url || ""),
+        filename: m.filename || "media",
+        kind: m.file_type === "video" ? ("video" as const) : ("image" as const),
+      })),
       platformIds,
       suggestedName: baseText.split("\n")[0] || "post",
     });
@@ -616,11 +625,18 @@ export default function PostsPage() {
           </button>
           <button
             onClick={openNewPost}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+            className="inline-flex items-center gap-2 rounded-lg border border-card-border px-4 py-2 text-sm font-medium text-muted hover:text-foreground hover:border-amber-500/30 transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Post
           </button>
+          <a
+            href="/dashboard/studio"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-shadow"
+          >
+            <Edit3 className="h-4 w-4" />
+            New in Studio
+          </a>
         </div>
       </div>
 
@@ -696,6 +712,17 @@ export default function PostsPage() {
             {posts.map((post) => {
               const cfg = STATUS_CONFIG[post.status];
               const isActioning = actionLoading === post.id;
+              const mediaList = post.media || [];
+              const firstImage = mediaList.find(
+                (m) => m.file_type !== "video" && (m.file_url || m.thumbnail_url)
+              );
+              const firstVideo = mediaList.find((m) => m.file_type === "video");
+              const thumb = firstImage || firstVideo;
+              const thumbPath = thumb
+                ? thumb.file_type === "video"
+                  ? thumb.thumbnail_url || thumb.file_url
+                  : thumb.file_url || thumb.thumbnail_url
+                : null;
               return (
                 <motion.div
                   key={post.id}
@@ -720,6 +747,33 @@ export default function PostsPage() {
                     </span>
                   </div>
 
+                  {/* media thumbnail */}
+                  {thumb && thumbPath && (
+                    <div className="relative mb-3 h-32 w-full overflow-hidden rounded-lg bg-stone-100">
+                      <img
+                        src={`${API_URL}${thumbPath}`}
+                        alt={thumb.filename || "Post media"}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      {thumb.file_type === "video" && (
+                        <div className="absolute top-2 left-2">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-black/50 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-medium text-white uppercase">
+                            <Film className="h-3 w-3" />
+                            Video
+                          </span>
+                        </div>
+                      )}
+                      {mediaList.length > 1 && (
+                        <div className="absolute bottom-2 right-2">
+                          <span className="rounded-md bg-black/50 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            +{mediaList.length - 1} more
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* text preview */}
                   <p className="text-sm leading-relaxed mb-4 flex-1 line-clamp-3">
                     {(post.content_text || "")?.length > 100
@@ -742,9 +796,11 @@ export default function PostsPage() {
                   {/* actions */}
                   <div className="flex flex-wrap gap-1.5 pt-3 border-t border-card-border">
                     <button
-                      onClick={() => openEditPost(post)}
+                      onClick={() => {
+                        window.location.href = `/dashboard/studio?post=${post.id}`;
+                      }}
                       className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-stone-100 transition-colors"
-                      title="Edit"
+                      title="Edit in Studio"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Edit</span>

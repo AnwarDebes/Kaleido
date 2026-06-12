@@ -388,11 +388,11 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
         <div className="flex gap-2 flex-wrap">
           <Link
-            href="/dashboard/posts?action=create"
+            href="/dashboard/studio"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
-            Create Post
+            Create in Studio
           </Link>
           <Link
             href="/dashboard/posts?action=generate"

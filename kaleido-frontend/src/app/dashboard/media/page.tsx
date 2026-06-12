@@ -22,6 +22,7 @@ import {
   Download,
   Share2,
   PenLine,
+  PenSquare,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNotificationStore } from "@/lib/notifications";
@@ -314,7 +315,7 @@ export default function MediaPage() {
     if (writingPostId) return;
     setWritingPostId(item.id);
     try {
-      await api.post(
+      const res = await api.post(
         "/posts/from-image",
         {
           media_id: item.id,
@@ -326,12 +327,18 @@ export default function MediaPage() {
         },
         { timeout: 300000 }
       );
-      addToast({
-        type: "success",
-        title: "Draft created from your image",
-        message: "The AI looked at your image and wrote captions for Instagram, X, and LinkedIn.",
-        action: { label: "Find it in Posts", onClick: () => router.push("/dashboard/posts") },
-      });
+      const newPostId = res.data.data?.post?.id;
+      if (newPostId) {
+        addToast({ type: "success", title: "Opening your post in the Studio" });
+        router.push(`/dashboard/studio?post=${newPostId}`);
+      } else {
+        addToast({
+          type: "success",
+          title: "Draft created from your image",
+          message: "The AI looked at your image and wrote captions for Instagram, X, and LinkedIn.",
+          action: { label: "Find it in Posts", onClick: () => router.push("/dashboard/posts") },
+        });
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: { message?: string } } } };
       addToast({
@@ -750,21 +757,33 @@ export default function MediaPage() {
                         }`}
                       >
                         {item.file_type === "image" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleWritePost(item);
-                            }}
-                            disabled={writingPostId !== null}
-                            className="rounded-md bg-stone-900/70 backdrop-blur-sm p-1.5 text-white hover:bg-stone-900 transition-colors disabled:opacity-60"
-                            title="Write a post about this image"
-                          >
-                            {writingPostId === item.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <PenLine className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleWritePost(item);
+                              }}
+                              disabled={writingPostId !== null}
+                              className="rounded-md bg-stone-900/70 backdrop-blur-sm p-1.5 text-white hover:bg-stone-900 transition-colors disabled:opacity-60"
+                              title="Write a post about this image"
+                            >
+                              {writingPostId === item.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <PenLine className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/studio?media=${item.id}`);
+                              }}
+                              className="rounded-md bg-stone-900/70 backdrop-blur-sm p-1.5 text-white hover:bg-stone-900 transition-colors"
+                              title="Compose in Studio"
+                            >
+                              <PenSquare className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={(e) => {
