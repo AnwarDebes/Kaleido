@@ -54,19 +54,20 @@ fi
 
 if [ "${1:-}" != "--no-tunnel" ]; then
   echo "==> Cloudflare tunnel"
-  if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+  if pgrep -f "cloudflared tunnel --no-autoupdate --url" >/dev/null 2>&1; then
     echo "    already running"
   else
     nohup "$ROOT/cloudflared" tunnel --no-autoupdate --url http://127.0.0.1:8001 --protocol http2 >> "$LOGS/cloudflared.log" 2>&1 &
-    echo "    started (pid $!), waiting for URL..."
+    echo "    tunnel started (pid $!), waiting for URL..."
     sleep 8
   fi
   URL=$(grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" "$LOGS/cloudflared.log" | tail -1)
+  echo "    tunnel URL: ${URL:-not found yet, check logs/cloudflared.log}"
+  # Repoint the permanent workers.dev proxy at the (possibly new) tunnel
+  # URL so the public API address never changes.
+  "$ROOT/update-api-proxy.sh" || echo "    WARNING: could not update the api proxy worker"
   echo ""
-  echo "    Public API URL: ${URL:-not found yet, check logs/cloudflared.log}"
-  echo "    IMPORTANT: quick tunnels get a NEW random URL on every restart."
-  echo "    Update NEXT_PUBLIC_API_URL in Vercel and redeploy the frontend,"
-  echo "    or set up a named tunnel with a stable hostname (needs a Cloudflare account)."
+  echo "    Public API URL (permanent): https://kaleido-api.goblin-anwar.workers.dev"
 fi
 
 echo ""
