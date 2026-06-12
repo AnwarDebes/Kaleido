@@ -12,10 +12,10 @@ from modules.referral.models import Referral
 REWARD_PER_REFERRAL = 10  # extra posts per successful referral
 
 SHARE_TEMPLATES = {
-    "twitter": "I've been using @KaleidoApp to manage my social media with AI — it's incredible! Try it free with my referral link: {link} #SocialMedia #AI",
-    "linkedin": "I recently started using Kaleido for AI-powered social media management and it has transformed my workflow. Generate content, schedule posts, and track analytics — all in one place.\n\nTry it free: {link}",
-    "instagram": "Managing social media just got easier with AI! I use Kaleido to create content, schedule posts, and grow my audience.\n\nTry it free — link in bio!\n{link}\n\n#SocialMedia #AI #ContentCreation #Marketing #Kaleido",
-    "facebook": "Just discovered Kaleido — an AI-powered social media management platform that generates content, creates images, and schedules everything automatically.\n\nTry it for free with my referral link:\n{link}",
+    "twitter": "I've been using @KaleidoApp to create my social media content with AI. It's free for everyone. Here's my referral link: {link} #SocialMedia #AI",
+    "linkedin": "I recently started using Kaleido to create social media content with AI. Generate posts, images and videos, plan your calendar, and share everything in one place. It's completely free.\n\nTry it: {link}",
+    "instagram": "Creating social media content just got easier with AI. I use Kaleido to make posts, images and videos, and it's completely free.\n\nLink in bio!\n{link}\n\n#SocialMedia #AI #ContentCreation #Marketing #Kaleido",
+    "facebook": "Just discovered Kaleido, a free AI studio for social media. It generates posts, images and videos that you can download and share anywhere.\n\nTry it with my referral link:\n{link}",
 }
 
 

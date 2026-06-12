@@ -1,15 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Play, Sparkles, Users, Globe2, Clock } from "lucide-react";
+import { ArrowRight, Play, Sparkles, Gift, Globe2, Cpu } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { getTranslations, isRTL } from "@/lib/i18n";
 
-const stats = [
-  { icon: Sparkles, value: "1M+", key: "posts" as const },
-  { icon: Users, value: "10K+", key: "users" as const },
-  { icon: Globe2, value: "9+", key: "platforms" as const },
-  { icon: Clock, value: "80%", key: "time" as const },
+const statIcons = [
+  { icon: Sparkles, key: "posts" as const },
+  { icon: Gift, key: "users" as const },
+  { icon: Globe2, key: "platforms" as const },
+  { icon: Cpu, key: "time" as const },
 ];
 
 export default function Hero() {
@@ -169,17 +169,17 @@ export default function Hero() {
             </div>
           </motion.div>
 
-          {/* Stats */}
+          {/* Honest highlights (no fake usage numbers) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
             className="mx-auto mt-16 grid max-w-3xl grid-cols-2 sm:grid-cols-4 gap-8"
           >
-            {stats.map((stat) => (
+            {statIcons.map((stat) => (
               <div key={stat.key} className="text-center">
                 <stat.icon className="mx-auto h-5 w-5 text-amber-500 mb-2" />
-                <div className="text-2xl font-bold">{stat.value}</div>
+                <div className="text-2xl font-bold">{t.heroStats[stat.key]}</div>
                 <div className="text-sm text-muted">{t.hero.stats[stat.key]}</div>
               </div>
             ))}

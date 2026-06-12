@@ -15,25 +15,20 @@ export default function Footer() {
       links: [
         { label: t.footer.links.features, href: "#features" },
         { label: t.footer.links.pricing, href: "#pricing" },
-        { label: t.footer.links.integrations, href: "#" },
-        { label: t.footer.links.changelog, href: "#" },
+        { label: t.nav.faq, href: "#faq" },
       ],
     },
     {
       title: t.footer.company,
       links: [
-        { label: t.footer.links.about, href: "#" },
-        { label: t.footer.links.blog, href: "#" },
-        { label: t.footer.links.careers, href: "#" },
-        { label: t.footer.links.contact, href: "#" },
+        { label: t.footer.links.contact, href: "mailto:hello@kaleido.social" },
       ],
     },
     {
       title: t.footer.legal,
       links: [
-        { label: t.footer.links.privacy, href: "#" },
-        { label: t.footer.links.terms, href: "#" },
-        { label: t.footer.links.cookies, href: "#" },
+        { label: t.footer.links.privacy, href: "/privacy" },
+        { label: t.footer.links.terms, href: "/terms" },
       ],
     },
   ];

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Kaleido",
+  title: "Privacy Policy | Kaleido",
   description: "Kaleido privacy policy. How we collect, use, and protect your data.",
 };
 

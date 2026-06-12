@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kaleido — AI-Powered Social Media Management",
+  title: "Kaleido | AI Social Media Studio",
   description:
     "Create, schedule, and grow your social media presence with AI-generated content, smart scheduling, and powerful analytics. Try Kaleido free.",
   keywords: [
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     "social media analytics",
   ],
   openGraph: {
-    title: "Kaleido — AI-Powered Social Media Management",
+    title: "Kaleido | AI Social Media Studio",
     description:
       "Create, schedule, and grow your social media presence with AI.",
     type: "website",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kaleido — AI-Powered Social Media Management",
+    title: "Kaleido | AI Social Media Studio",
     description:
       "Create, schedule, and grow your social media presence with AI.",
   },

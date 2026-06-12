@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Kaleido",
+  title: "Terms of Service | Kaleido",
   description: "Kaleido terms of service. Rules and guidelines for using our platform.",
 };
 
@@ -14,12 +14,12 @@ export default function TermsOfService() {
       <div className="space-y-8 text-sm leading-relaxed text-muted">
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">1. Acceptance of Terms</h2>
-          <p>By accessing or using Kaleido, you agree to be bound by these Terms of Service. If you do not agree, you may not use the service. These terms apply to all users, including free and paid plan subscribers.</p>
+          <p>By accessing or using Kaleido, you agree to be bound by these Terms of Service. If you do not agree, you may not use the service. These terms apply to all users.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">2. Service Description</h2>
-          <p>Kaleido is an AI-powered social media management platform that provides content generation, image creation, scheduling, analytics, and multi-platform publishing. Features vary by subscription plan.</p>
+          <p>Kaleido is an AI social media platform that provides content generation, image and video creation, scheduling, analytics, and tools to share your content on social platforms. Every feature is available to every user.</p>
         </section>
 
         <section>
@@ -43,8 +43,8 @@ export default function TermsOfService() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-3">7. Subscription and Billing</h2>
-          <p>Paid plans are billed on a monthly or annual basis. You may cancel at any time, with access continuing until the end of the billing period. Refunds are provided within 14 days of initial purchase for annual plans if you are unsatisfied with the service.</p>
+          <h2 className="text-lg font-semibold text-foreground mb-3">7. Free Service</h2>
+          <p>Kaleido is provided free of charge. There are no subscriptions, no billing, and no paid plans. We will never ask you for payment details to use the service.</p>
         </section>
 
         <section>
