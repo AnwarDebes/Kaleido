@@ -43,8 +43,36 @@ async def _publish_post(post_id: str):
 
     async with async_session() as db:
         try:
-            post = await Publisher.publish_post(db, uuid.UUID(post_id))
-            logger.info("post_published", post_id=post_id, status=post.status)
+            post, summary = await Publisher.publish_post(db, uuid.UUID(post_id))
+            logger.info(
+                "post_published",
+                post_id=post_id,
+                status=post.status,
+                summary=summary,
+            )
+
+            # In manual-share mode, a due post can't auto-publish. Ping the
+            # user's phone (their own Telegram bot) with the ready-to-paste
+            # caption so the schedule still does its job.
+            if post.status == "needs_manual_share":
+                try:
+                    from modules.notifications.service import ReminderService
+
+                    settings_row = await ReminderService.get_settings(db, post.user_id)
+                    if settings_row is not None and settings_row.reminders_enabled:
+                        message = ReminderService.format_post_message(
+                            heading="Time to post! This was scheduled for now:",
+                            content_text=post.content_text,
+                            hashtags=post.hashtags,
+                            platforms=list((post.platform_contents or {}).keys()),
+                        )
+                        await ReminderService.send_to_phone(db, post.user_id, message)
+                except Exception as notify_err:
+                    logger.warning(
+                        "due_post_reminder_failed",
+                        post_id=post_id,
+                        error=str(notify_err),
+                    )
         except Exception as e:
             logger.error("post_publish_failed", post_id=post_id, error=str(e))
             raise

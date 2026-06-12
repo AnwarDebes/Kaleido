@@ -94,10 +94,13 @@ async def publish_post_now(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    post = await Publisher.publish_post(db, post_id)
+    post, summary = await Publisher.publish_post(db, post_id, user.id)
     return {
         "success": True,
-        "data": PostResponse.model_validate(post).model_dump(),
+        "data": {
+            **PostResponse.model_validate(post).model_dump(),
+            "publication_summary": summary,
+        },
     }
 
 
@@ -107,7 +110,7 @@ async def get_publication_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    publications = await Publisher.get_publication_status(db, post_id)
+    publications = await Publisher.get_publication_status(db, post_id, user.id)
     return {
         "success": True,
         "data": [PublicationStatusResponse.model_validate(p).model_dump() for p in publications],

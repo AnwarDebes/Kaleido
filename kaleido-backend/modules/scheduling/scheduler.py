@@ -132,7 +132,16 @@ class Scheduler:
         query = select(Post).where(
             Post.user_id == user_id,
             Post.deleted_at.is_(None),
-            Post.status.in_(["scheduled", "published", "publishing", "failed"]),
+            Post.status.in_(
+                [
+                    "scheduled",
+                    "published",
+                    "publishing",
+                    "partially_published",
+                    "needs_manual_share",
+                    "failed",
+                ]
+            ),
         )
 
         # Filter by scheduled_at or published_at within range
